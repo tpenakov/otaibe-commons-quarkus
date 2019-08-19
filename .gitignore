@@ -1,0 +1,26 @@
+#ignore the whole idea project help files, they will be created from the pom.xml by need
+.idea
+#ignore the idea project files
+*.iml
+#some MAC files
+*DS_Store
+#logs
+/*.log
+#maven target dir
+target/
+#eclipse directories
+.settings
+
+#some custom files
+atlassian-ide-plugin.xml
+*.diff
+.classpath
+.project
+#directory for local signal files creation
+profiles-local-dir
+trading_details-testing
+xmlSignalfiles-testing-archive
+xmlSignalfiles-testing
+src/main/java/META-INF/sun-jaxb.episode
+payment/src/main/java/META-INF/sun-jaxb.episode
+ota/src/main/java/META-INF/sun-jaxb.episode
