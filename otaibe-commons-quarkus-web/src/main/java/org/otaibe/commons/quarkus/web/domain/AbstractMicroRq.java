@@ -14,6 +14,7 @@ public class AbstractMicroRq<T> {
         FIND,
         SAVE,
         BULK_SAVE,
+        CREATE,
         DELETE,
         LOGIN,
     }
