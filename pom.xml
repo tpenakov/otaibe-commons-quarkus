@@ -11,6 +11,7 @@
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
+        <module>otaibe-commons-quarkus-web</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
