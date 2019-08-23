@@ -9,7 +9,6 @@ import java.util.List;
 @NoArgsConstructor
 public class AbstractMicroRs<T> {
     List<T> result;
-    Boolean deleteByIdResult;
     Page page;
     ErrorRs error;
 }

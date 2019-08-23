@@ -10,11 +10,16 @@ import java.util.List;
 @NoArgsConstructor
 public class AbstractMicroRq<T> {
 
-    public enum ACTION {FIND, SAVE, BULK_SAVE}
+    public enum ACTION {
+        FIND,
+        SAVE,
+        BULK_SAVE,
+        DELETE,
+        LOGIN,
+    }
 
     List<T> data;
     ACTION action;
-    String deleteById;
     Page page;
 
     public void add(T entity) {
