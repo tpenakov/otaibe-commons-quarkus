@@ -10,6 +10,7 @@
     <version>00.00.01-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
+        <module>otaibe-commons-quarkus-rest</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
