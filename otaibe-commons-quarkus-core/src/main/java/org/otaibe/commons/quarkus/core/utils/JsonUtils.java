@@ -80,11 +80,11 @@ public class JsonUtils {
         }
     }
 
-    public <T> T deepClone(final T input, Class<T> resultType) {
+    public <T> T deepClone(final Object input, Class<T> resultType) {
         return deepClone(input, getObjectMapper(), resultType);
     }
 
-    public <T> T deepClone(final T input, ObjectMapper objectMapper, Class<T> resultType) {
+    public <T> T deepClone(final Object input, ObjectMapper objectMapper, Class<T> resultType) {
         if (input == null) {
             return null;
         }

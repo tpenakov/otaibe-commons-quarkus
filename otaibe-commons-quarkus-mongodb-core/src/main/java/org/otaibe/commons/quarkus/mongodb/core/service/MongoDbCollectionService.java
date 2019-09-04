@@ -7,6 +7,7 @@ import com.mongodb.reactivestreams.client.MongoClients;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BsonDocument;
 import org.bson.BsonDocumentWriter;
 import org.bson.codecs.EncoderContext;
@@ -21,7 +22,9 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.validation.Valid;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -33,8 +36,9 @@ import static org.bson.codecs.configuration.CodecRegistries.*;
 @Slf4j
 public abstract class MongoDbCollectionService<T extends IdEntity> {
 
-    static final EncoderContext ENCODER_CONTEXT = EncoderContext.builder().build();
+    public static final EncoderContext ENCODER_CONTEXT = EncoderContext.builder().build();
 
+    Class<T> mainClass;
     MongoCollection<T> collection;
     CodecRegistry pojoCodecRegistry;
 
@@ -42,9 +46,18 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
 
     }
 
-    public MongoDbCollectionService(MongoDbDatabaseService service, String collectionName, Class<T>... clasesArray) {
+    public MongoDbCollectionService(MongoDbDatabaseService service,
+                                    String collectionName,
+                                    Class<T> mainClass,
+                                    Class... clasesArray) {
+        this.mainClass = mainClass;
         PojoCodecProvider.Builder builder = PojoCodecProvider.builder();
-        Arrays.stream(clasesArray)
+        List<Class> classesList = new ArrayList<>();
+        classesList.add(mainClass);
+        if (ArrayUtils.isNotEmpty(clasesArray)) {
+            classesList.addAll(Arrays.asList(clasesArray));
+        }
+        classesList.stream()
                 .map(clazz -> clazz.getPackage().getName())
                 .distinct()
                 .forEach(s -> builder.register(s));
@@ -56,7 +69,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 fromCodecs(new DateTimeCodec())
         );
         collection = service.getDatabase()
-                .getCollection(collectionName, clasesArray[0]) //first class is the main class in collection
+                .getCollection(collectionName, mainClass)
                 .withCodecRegistry(pojoCodecRegistry)
         ;
     }
@@ -105,7 +118,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 .doOnError(throwable -> log.error("byAllNotNullFields error", throwable));
     }
 
-    public Mono<T> save(T entity) {
+    public Mono<T> save(@Valid T entity) {
         return Optional.ofNullable(entity.getId())
                 .map(objectId -> Mono.from(
                         getCollection().findOneAndReplace(
