@@ -9,9 +9,11 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 import org.bson.types.ObjectId;
 
+import java.io.Serializable;
+
 @EqualsAndHashCode
 @ToString
-public abstract class IdEntity {
+public abstract class IdEntity implements Serializable {
     public static final String ID = "_id";
 
     @JsonIgnore
