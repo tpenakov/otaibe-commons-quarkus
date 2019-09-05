@@ -3,44 +3,37 @@ package org.otaibe.commons.quarkus.mongodb.core.service;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.reactivestreams.client.FindPublisher;
-import com.mongodb.reactivestreams.client.MongoClients;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.ArrayUtils;
 import org.bson.BsonDocument;
-import org.bson.BsonDocumentWriter;
-import org.bson.codecs.EncoderContext;
-import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
-import org.bson.codecs.pojo.PojoCodecProvider;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.otaibe.commons.quarkus.mongodb.core.codec.DateTimeCodec;
 import org.otaibe.commons.quarkus.mongodb.core.domain.IdEntity;
+import org.otaibe.commons.quarkus.mongodb.core.utils.BsonUtils;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.inject.Inject;
 import javax.validation.Valid;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import static org.bson.codecs.configuration.CodecRegistries.*;
 
 @Getter
 @Slf4j
 public abstract class MongoDbCollectionService<T extends IdEntity> {
 
-    public static final EncoderContext ENCODER_CONTEXT = EncoderContext.builder().build();
-
     Class<T> mainClass;
     MongoCollection<T> collection;
     CodecRegistry pojoCodecRegistry;
+
+    @Inject
+    BsonUtils bsonUtils;
 
     public MongoDbCollectionService() {
 
@@ -51,36 +44,20 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                                     Class<T> mainClass,
                                     Class... clasesArray) {
         this.mainClass = mainClass;
-        PojoCodecProvider.Builder builder = PojoCodecProvider.builder();
-        List<Class> classesList = new ArrayList<>();
-        classesList.add(mainClass);
-        if (ArrayUtils.isNotEmpty(clasesArray)) {
-            classesList.addAll(Arrays.asList(clasesArray));
-        }
-        classesList.stream()
-                .map(clazz -> clazz.getPackage().getName())
-                .distinct()
-                .forEach(s -> builder.register(s));
-
-        CodecProvider pojoCodecProvider = builder.build();
-        pojoCodecRegistry = fromRegistries(
-                MongoClients.getDefaultCodecRegistry(),
-                fromProviders(pojoCodecProvider),
-                fromCodecs(new DateTimeCodec())
-        );
+        this.pojoCodecRegistry = BsonUtils.createPojoCodecRegistry(mainClass, clasesArray);
         collection = service.getDatabase()
                 .getCollection(collectionName, mainClass)
-                .withCodecRegistry(pojoCodecRegistry)
+                .withCodecRegistry(this.pojoCodecRegistry)
         ;
     }
 
-    public BsonDocument toBsonDocument(T template, Class<T> clazz) {
-        BsonDocument bsonDocument = new BsonDocument();
 
-        getPojoCodecRegistry()
-                .get(clazz)
-                .encode(new BsonDocumentWriter(bsonDocument), template, ENCODER_CONTEXT);
-        return bsonDocument;
+    public BsonDocument toBsonDocument(T template, Class<T> clazz) {
+        return getBsonUtils().toBsonDocument(template, clazz, getPojoCodecRegistry());
+    }
+
+    public T fromMap(Map<String, Object> map, Class<T> clazz) {
+        return getBsonUtils().fromMap(map, clazz, getPojoCodecRegistry());
     }
 
     /**
