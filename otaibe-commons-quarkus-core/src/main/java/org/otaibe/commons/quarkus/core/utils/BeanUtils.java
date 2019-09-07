@@ -2,12 +2,13 @@ package org.otaibe.commons.quarkus.core.utils;
 
 import lombok.extern.slf4j.Slf4j;
 
+import javax.enterprise.context.ApplicationScoped;
 import java.io.*;
 
 /**
- * Does not work very well on quarkus - instantinate by yourself in the desured project
  * Created by triphon on 11.11.16.
  */
+@ApplicationScoped
 @Slf4j
 public class BeanUtils {
 
