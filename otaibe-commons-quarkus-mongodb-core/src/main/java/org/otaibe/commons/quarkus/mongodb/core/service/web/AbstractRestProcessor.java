@@ -49,48 +49,64 @@ public abstract class AbstractRestProcessor<
 
         switch (rq1.getAction()) {
             case DELETE:
-                if (firstEntityOptional.isPresent()) {
-                    return getService().deleteByIdPretty(firstEntityOptional.get().getIdPretty())
-                            .filter(aBoolean -> aBoolean)
-                            .switchIfEmpty(Mono.error(new RuntimeException("unable to delete entity")))
-                            .then();
-                }
-                rs2.setResult(new ArrayList<>());
-                return Mono.just(true).then();
+                return delete(rs2, firstEntityOptional);
             case FIND:
-                T entity = firstEntityOptional
-                        .orElse(createEmptyEntity());
-                return getService().findByAllNotNullFields(entity, page.getNumber() * page.getSize(), page.getSize())
-                        .collectList()
-                        .map(entities -> {
-                            RS rs1 = createAndStoreMicroRS(rs);
-                            rs1.setResult(entities);
-                            rs1.setPage(page);
-                            return true;
-                        })
-                        .then();
+                return find(firstEntityOptional, rs, page);
             case SAVE:
-                if (firstEntityOptional.isPresent()) {
-                    return getService().save(firstEntityOptional.get())
-                            .map(entity1 -> {
-                                rs2.setResult(Arrays.asList(entity1));
-                                return entity1;
-                            })
-                            .then();
-                }
-                rs2.setResult(new ArrayList<>());
-                return Mono.just(true).then();
+                return save(firstEntityOptional, rs2);
             case BULK_SAVE:
-                return getService().bulkSave(rq1.getData())
-                        .collectList()
-                        .map(ts -> {
-                            rs2.setResult(ts);
-                            return ts;
-                        })
-                        .then();
+                return bulkSave(rq1, rs2);
             default:
                 return Mono.error(new RuntimeException("unknown action"));
         }
 
+    }
+
+    protected Mono<Void> bulkSave(RQ rq1, RS rs2) {
+        return getService().bulkSave(rq1.getData())
+                .collectList()
+                .map(ts -> {
+                    rs2.setResult(ts);
+                    return ts;
+                })
+                .then();
+    }
+
+    protected Mono<Void> save(Optional<T> firstEntityOptional, RS rs2) {
+        if (firstEntityOptional.isPresent()) {
+            return getService().save(firstEntityOptional.get())
+                    .map(entity1 -> {
+                        rs2.setResult(Arrays.asList(entity1));
+                        return entity1;
+                    })
+                    .then();
+        }
+        rs2.setResult(new ArrayList<>());
+        return Mono.just(true).then();
+    }
+
+    protected Mono<Void> find(Optional<T> firstEntityOptional, ROOT_RS rs, Page page) {
+        T entity = firstEntityOptional
+                .orElse(createEmptyEntity());
+        return getService().findByAllNotNullFields(entity, page.getNumber() * page.getSize(), page.getSize())
+                .collectList()
+                .map(entities -> {
+                    RS rs1 = createAndStoreMicroRS(rs);
+                    rs1.setResult(entities);
+                    rs1.setPage(page);
+                    return true;
+                })
+                .then();
+    }
+
+    protected Mono<Void> delete(RS rs2, Optional<T> firstEntityOptional) {
+        if (firstEntityOptional.isPresent()) {
+            return getService().deleteByIdPretty(firstEntityOptional.get().getIdPretty())
+                    .filter(aBoolean -> aBoolean)
+                    .switchIfEmpty(Mono.error(new RuntimeException("unable to delete entity")))
+                    .then();
+        }
+        rs2.setResult(new ArrayList<>());
+        return Mono.just(true).then();
     }
 }

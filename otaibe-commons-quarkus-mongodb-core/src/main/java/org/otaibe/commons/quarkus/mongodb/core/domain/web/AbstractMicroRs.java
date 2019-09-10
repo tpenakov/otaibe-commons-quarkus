@@ -1,11 +1,13 @@
 package org.otaibe.commons.quarkus.mongodb.core.domain.web;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.otaibe.commons.quarkus.mongodb.core.domain.IdEntity;
 
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
 @NoArgsConstructor
 public class AbstractMicroRs<T extends IdEntity>
-        extends org.otaibe.commons.quarkus.web.domain.AbstractMicroRs {
+        extends org.otaibe.commons.quarkus.web.domain.AbstractMicroRs<T> {
 }

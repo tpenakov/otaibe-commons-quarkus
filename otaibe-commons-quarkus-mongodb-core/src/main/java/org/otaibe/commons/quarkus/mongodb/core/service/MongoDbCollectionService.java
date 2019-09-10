@@ -116,7 +116,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 ;
     }
 
-    public Flux<T> bulkSave(List<T> entities) {
+    public Flux<T> bulkSave(@Valid List<T> entities) {
 
         List<WriteModel<T>> writes = entities.stream()
                 .map(t -> {
