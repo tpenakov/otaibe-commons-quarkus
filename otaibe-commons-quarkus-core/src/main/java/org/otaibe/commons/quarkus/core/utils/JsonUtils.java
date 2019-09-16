@@ -1,6 +1,8 @@
 package org.otaibe.commons.quarkus.core.utils;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.io.IOException;
@@ -28,6 +31,15 @@ public class JsonUtils {
 
     @Inject
     ObjectMapper objectMapper;
+
+    @PostConstruct
+    void init() {
+        getObjectMapper()
+                // perform configuration
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
+        ;
+    }
 
     public <T> T fromMap(Map input, Class<T> outputClass) {
         return fromMap(input, getObjectMapper(), outputClass);
@@ -102,6 +114,10 @@ public class JsonUtils {
 
     public Object toStringLazy(Object input, ObjectMapper objectMapper) {
         return new ToStringLazy(input, objectMapper);
+    }
+
+    public <T> Optional<T> readValue(String value, Class<T> clazz) {
+        return readValue(value, clazz, getObjectMapper());
     }
 
     public <T> Optional<T> readValue(String value, Class<T> clazz, ObjectMapper objectMapper1) {
