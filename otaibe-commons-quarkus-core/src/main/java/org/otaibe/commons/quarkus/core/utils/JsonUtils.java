@@ -1,12 +1,11 @@
 package org.otaibe.commons.quarkus.core.utils;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.otaibe.commons.quarkus.core.beans.CustomObjectMapperConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,14 +30,13 @@ public class JsonUtils {
 
     @Inject
     ObjectMapper objectMapper;
+    @Inject
+    CustomObjectMapperConfig customObjectMapperConfig;
 
     @PostConstruct
     void init() {
-        getObjectMapper()
-                // perform configuration
-                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-                .configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false)
-        ;
+        // perform configuration
+        getCustomObjectMapperConfig().fillObjectMapper(getObjectMapper());
     }
 
     public <T> T fromMap(Map input, Class<T> outputClass) {
