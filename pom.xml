@@ -15,6 +15,7 @@
         <module>otaibe-commons-quarkus-mongodb-core</module>
         <module>otaibe-commons-quarkus-eureka-client</module>
         <module>otaibe-commons-quarkus-actuator</module>
+        <module>otaibe-commons-quarkus-yml-config</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
@@ -107,6 +108,11 @@
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
                 <version>${jackson.version}.2</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-yaml</artifactId>
+                <version>${jackson.version}</version>
             </dependency>
 
             <dependency>
