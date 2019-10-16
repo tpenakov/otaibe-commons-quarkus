@@ -36,7 +36,7 @@ public class JsonUtils {
     @PostConstruct
     void init() {
         // perform configuration
-        getCustomObjectMapperConfig().fillObjectMapper(getObjectMapper());
+        //getCustomObjectMapperConfig().fillObjectMapper(getObjectMapper());
     }
 
     public <T> T fromMap(Map input, Class<T> outputClass) {
