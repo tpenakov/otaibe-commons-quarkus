@@ -14,6 +14,7 @@
         <module>otaibe-commons-quarkus-web</module>
         <module>otaibe-commons-quarkus-mongodb-core</module>
         <module>otaibe-commons-quarkus-eureka-client</module>
+        <module>otaibe-commons-quarkus-actuator</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
@@ -25,10 +26,17 @@
         <jackson.version>2.9.9</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
         <vertx.version>3.8.2</vertx.version>
+        <quarkus.version>0.24.0</quarkus.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-core</artifactId>
+                <version>${quarkus.version}</version>
+            </dependency>
+
             <dependency>
                 <groupId>org.eclipse.microprofile.config</groupId>
                 <artifactId>microprofile-config-api</artifactId>
