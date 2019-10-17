@@ -110,7 +110,6 @@ public class EurekaClient {
                             .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
                             .map(Map.Entry::getKey)
                             .collect(Collectors.toList())
-                            .stream()
                             .forEach(s -> getServersMap().remove(s))
                             ;
                     return registerApp();
