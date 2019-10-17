@@ -20,12 +20,14 @@ import java.text.MessageFormat;
 @ToString
 public class InstanceInfo {
 
+    public static final String UP = "UP";
+
     public static final String INSTANCE_XML_TEMPLATE = "<instance>\n" +
             "      <instanceId>{0}:{1}:{2,number,#}</instanceId>\n" +
             "      <hostName>{3}</hostName>\n" +
             "      <app>{1}</app>\n" +
             "      <ipAddr>{6}</ipAddr>\n" +
-            "      <status>UP</status>\n" +
+            "      <status>" + UP + "</status>\n" +
 //            "      <overriddenstatus>UNKNOWN</overriddenstatus>\n" +
             "      <port enabled=\"true\">{2,number,#}</port>\n" +
             "      <securePort enabled=\"false\">443</securePort>\n" +

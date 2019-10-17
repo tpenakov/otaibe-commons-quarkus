@@ -12,11 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
+import org.otaibe.commons.quarkus.core.utils.MapWrapper;
 import org.otaibe.commons.quarkus.eureka.client.domain.InstanceInfo;
 import reactor.adapter.rxjava.RxJava2Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -29,7 +32,13 @@ import java.net.Inet4Address;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * based on:
@@ -61,12 +70,16 @@ public class EurekaClient {
     JsonUtils jsonUtils;
     @Inject
     ObjectMapper objectMapper;
+    @Inject
+    MapWrapper mapWrapper;
 
     WebClient client;
     UriBuilder apiPath;
     VertxImpl vertxDelegate;
 
     InstanceInfo instanceInfo;
+
+    Map<String, Tuple2<LocalDateTime, List<String>>> serversMap = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void init() {
@@ -85,11 +98,23 @@ public class EurekaClient {
         vertxDelegate = (VertxImpl) getVertx().getDelegate();
 
         initInstanceInfo();
+        Duration period = Duration.ofSeconds(30);
 
         registerApp()
                 .subscribeOn(Schedulers.fromExecutorService(getVertxDelegate().getWorkerPool()))
-                .flatMapMany(aBoolean -> Flux.interval(Duration.ofSeconds(30)))
-                .flatMap(aLong -> registerApp())
+                .flatMapMany(aBoolean -> Flux.interval(period))
+                .flatMap(aLong -> {
+                    LocalDateTime threshold = LocalDateTime.now().minus(period);
+                    getServersMap().entrySet()
+                            .stream()
+                            .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
+                            .map(Map.Entry::getKey)
+                            .collect(Collectors.toList())
+                            .stream()
+                            .forEach(s -> getServersMap().remove(s))
+                            ;
+                    return registerApp();
+                })
                 .subscribe()
         ;
     }
@@ -98,18 +123,51 @@ public class EurekaClient {
         /**
          * curl -v -H 'Accept: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps
          */
-        return RxJava2Adapter.singleToMono(getClient()
-                .get(getApiPath().build().getPath())
-                .putHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .rxSend()
-        )
-                .map(bufferHttpResponse -> bufferHttpResponse.bodyAsString())
-                .doOnNext(s -> log.debug("all apps: {}", s))
-                .map(s -> (Map<String, Object>) getJsonUtils().readValue(s, Map.class, getObjectMapper()).get())
-                //.doOnError(throwable -> log.error("error", throwable))
-                .retryBackoff(10, Duration.ofMillis(100), Duration.ofSeconds(1), .5)
-                .doOnError(throwable -> log.error("unable to get all apps", throwable))
+        return getApps(getApiPath().build().getPath());
+    }
+
+    public Mono<String> getNextServer(String serviceName) {
+        /**
+         * curl -v -H 'Accept: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{APP_ID}
+         */
+        String key = serviceName.toLowerCase();
+        if (getServersMap().containsKey(key)) {
+            Tuple2<LocalDateTime, List<String>> objects = getServersMap().get(key);
+            List<String> t2 = objects.getT2();
+            if (!t2.isEmpty()) {
+
+                if (t2.size() == 1) {
+                    return Mono.just(t2.get(0));
+                }
+
+                List<String> urls = new ArrayList<>(t2);
+                String result = urls.remove(0);
+                urls.add(result);
+                getServersMap().put(key, Tuples.of(objects.getT1(), urls));
+                return Mono.just(result);
+            }
+        }
+
+        return getApps(getPath(serviceName))
+                .map(map ->
+                        Optional.ofNullable(
+                                getMapWrapper().getValue(map, List.class, "application", "instance")))
+                .map(list -> list.orElseThrow(() -> new RuntimeException("unable to find instane of type " + key)))
+                .map(list -> list
+                        .stream()
+                        .filter(o -> StringUtils.equals(InstanceInfo.UP, getMapWrapper().getStringValue((Map) o, "status")))
+                        .map(o -> getMapWrapper().getStringValue((Map) o, "homePageUrl"))
+                        .collect(Collectors.toList())
+                )
+                .map(o -> (List) o)
+                .filter(list -> !list.isEmpty())
+                .flatMap(list -> {
+                    getServersMap().put(key, Tuples.of(LocalDateTime.now(), list));
+                    return getNextServer(serviceName);
+                })
+                .switchIfEmpty(Mono.error(new RuntimeException("unable to find instane of type " + key)))
                 ;
+
     }
 
     public Mono<Boolean> registerApp() {
@@ -118,14 +176,14 @@ public class EurekaClient {
         String rqString = instanceInfo.toXmlString();
 
         /**
-          curl -v -H 'Content-Type: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{appName} \
-           -X POST -d @/home/triphon/tmp.json
+         curl -v -H 'Content-Type: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{appName} \
+         -X POST -d @/home/triphon/tmp.json
          */
         return RxJava2Adapter.singleToMono(getClient()
-                .post(getPath(appName))
+                        .post(getPath(appName))
 //                .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-                .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML)
-                .rxSendBuffer(Buffer.buffer(rqString))
+                        .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML)
+                        .rxSendBuffer(Buffer.buffer(rqString))
         )
                 .doOnSubscribe(subscription -> log.trace("instance info: {}", rqString))
                 .doOnNext(response -> log.debug("status code: {}, body: {}", response.statusCode(), response.bodyAsString()))
@@ -135,6 +193,21 @@ public class EurekaClient {
                 .switchIfEmpty(Mono.error(new RuntimeException("not registered")))
                 //.doOnError(throwable -> log.error("error", throwable))
                 .retryBackoff(Long.MAX_VALUE, Duration.ofMillis(100), Duration.ofSeconds(15), .5)
+                .doOnError(throwable -> log.error("unable to get all apps", throwable))
+                ;
+    }
+
+    private Mono<Map<String, Object>> getApps(String path) {
+        return RxJava2Adapter.singleToMono(getClient()
+                .get(path)
+                .putHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
+                .rxSend()
+        )
+                .map(bufferHttpResponse -> bufferHttpResponse.bodyAsString())
+                .doOnNext(s -> log.debug("all apps: {}", s))
+                .map(s -> (Map<String, Object>) getJsonUtils().readValue(s, Map.class, getObjectMapper()).get())
+                //.doOnError(throwable -> log.error("error", throwable))
+                .retryBackoff(10, Duration.ofMillis(100), Duration.ofSeconds(1), .5)
                 .doOnError(throwable -> log.error("unable to get all apps", throwable))
                 ;
     }
