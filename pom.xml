@@ -16,26 +16,38 @@
         <module>otaibe-commons-quarkus-eureka-client</module>
         <module>otaibe-commons-quarkus-actuator</module>
         <module>otaibe-commons-quarkus-yml-config</module>
+        <module>otaibe-commons-quarkus-aws</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <quarkus.version>0.24.0</quarkus.version>
+        <aws.sdk.version>2.9.9</aws.sdk.version>
         <jackson.version>2.9.9</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
         <vertx.version>3.8.2</vertx.version>
-        <quarkus.version>0.24.0</quarkus.version>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
 
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>io.quarkus</groupId>
-                <artifactId>quarkus-core</artifactId>
+                <artifactId>quarkus-bom</artifactId>
                 <version>${quarkus.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws.sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <dependency>
