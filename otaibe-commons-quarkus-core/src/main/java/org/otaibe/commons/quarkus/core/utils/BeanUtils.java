@@ -18,13 +18,13 @@ public class BeanUtils {
         }
 
         try {
-            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()){
-                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream)){
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream)) {
                     objectOutputStream.writeObject(input);
                 }
 
-                try (ByteArrayInputStream inputStream = new ByteArrayInputStream(outputStream.toByteArray())){
-                    try (ObjectInputStream objectInputStream = new ObjectInputStream(inputStream)){
+                try (ByteArrayInputStream inputStream = new ByteArrayInputStream(outputStream.toByteArray())) {
+                    try (ObjectInputStream objectInputStream = new ObjectInputStream(inputStream)) {
                         T res = (T) objectInputStream.readObject();
                         return res;
                     }
@@ -32,6 +32,34 @@ public class BeanUtils {
             }
         } catch (Exception e) {
             log.error("unable to deep clone object", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public <T extends Serializable> byte[] toBytes(T input) {
+        try {
+            try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                try (ObjectOutputStream objectOutputStream = new ObjectOutputStream(outputStream)) {
+                    objectOutputStream.writeObject(input);
+                    return outputStream.toByteArray();
+                }
+            }
+        } catch (Exception e) {
+            log.error("unable to serialize object", e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    public <T extends Serializable> T fromBytes(byte[] input) {
+        try {
+            try (ByteArrayInputStream inputStream = new ByteArrayInputStream(input)) {
+                try (ObjectInputStream objectInputStream = new ObjectInputStream(inputStream)) {
+                    T res = (T) objectInputStream.readObject();
+                    return res;
+                }
+            }
+        } catch (Exception e) {
+            log.error("unable to deserialize object", e);
             throw new RuntimeException(e);
         }
     }

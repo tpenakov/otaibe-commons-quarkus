@@ -118,7 +118,23 @@ public class JsonUtils {
         return readValue(value, clazz, getObjectMapper());
     }
 
+    public <T> Optional<T> readValue(byte[] value, Class<T> clazz) {
+        return readValue(value, clazz, getObjectMapper());
+    }
+
     public <T> Optional<T> readValue(String value, Class<T> clazz, ObjectMapper objectMapper1) {
+        return Optional.ofNullable(objectMapper1)
+                .map(objectMapper -> {
+                    try {
+                        return objectMapper.readValue(value, clazz);
+                    } catch (IOException e) {
+                        logger.error("unable to deserialize", e);
+                    }
+                    return null;
+                });
+    }
+
+    public <T> Optional<T> readValue(byte[] value, Class<T> clazz, ObjectMapper objectMapper1) {
         return Optional.ofNullable(objectMapper1)
                 .map(objectMapper -> {
                     try {

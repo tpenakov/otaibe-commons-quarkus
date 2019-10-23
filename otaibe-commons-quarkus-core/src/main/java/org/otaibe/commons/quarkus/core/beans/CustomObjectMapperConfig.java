@@ -6,12 +6,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
 import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.inject.Produces;
-import javax.inject.Singleton;
 
 @ApplicationScoped
 public class CustomObjectMapperConfig {
 
+    /*
     @Singleton
     @Produces
     public ObjectMapper objectMapper() {
@@ -21,6 +20,7 @@ public class CustomObjectMapperConfig {
         //mapper.enable(SerializationFeature.INDENT_OUTPUT);
         return mapper;
     }
+     */
 
     public void fillObjectMapper(ObjectMapper objectMapper1) {
 
