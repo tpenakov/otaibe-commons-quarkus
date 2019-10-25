@@ -5,6 +5,7 @@ import io.reactiverse.reactivex.pgclient.Tuple;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
@@ -18,10 +19,7 @@ import reactor.util.function.Tuples;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -105,6 +103,56 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
                 )
                 .doOnNext(rows -> log.trace("save data: {}", rows))
                 .map(rows -> data);
+    }
+
+    public Mono<Boolean> batchSave(List<T> dataList) {
+        if (CollectionUtils.isEmpty(dataList)) {
+            return Mono.just(true);
+        }
+
+        List<Tuple2<Tuple2<String, Tuple>, Tuple2<String, Tuple>>> batchData = dataList.stream()
+                .map(containersStats ->
+                        Tuples.of(
+                                prepareForInsert(containersStats),
+                                Tuples.of(getDeleteByIdSql(), getIdTuple(containersStats))
+                        )
+                )
+                .collect(Collectors.toList());
+
+        Tuple2<String, List<Tuple>> deleteData = batchData.stream()
+                .map(objects -> Tuples.of(objects.getT2().getT1(), Arrays.asList(objects.getT2().getT2())))
+                .reduce((objects, objects2) -> {
+                    List<Tuple> list = new ArrayList(objects.getT2());
+                    list.addAll(objects2.getT2());
+                    return Tuples.of(objects.getT1(), list);
+                })
+                .orElseThrow(() -> new RuntimeException("unable to create delete data batch"))
+                ;
+
+        Tuple2<String, List<Tuple>> insertData = batchData.stream()
+                .map(objects -> Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
+                .reduce((objects, objects2) -> {
+                    List<Tuple> list = new ArrayList(objects.getT2());
+                    list.addAll(objects2.getT2());
+                    return Tuples.of(objects.getT1(), list);
+                })
+                .orElseThrow(() -> new RuntimeException("unable to create insert data batch"))
+                ;
+
+        return RxJava2Adapter
+                .singleToMono(getClient().rxBegin())
+                .flatMap(pgTransaction -> RxJava2Adapter
+                        .singleToMono(pgTransaction.rxPreparedBatch(deleteData.getT1(), deleteData.getT2()))
+                        .zipWhen(rows -> RxJava2Adapter
+                                .singleToMono(pgTransaction.rxPreparedBatch(insertData.getT1(), insertData.getT2())))
+                        .zipWhen(objects -> RxJava2Adapter
+                                .completableToMono(pgTransaction.rxCommit())
+                                .then(Mono.just(true))
+                        )
+                )
+                .doOnNext(rows -> log.trace("save data: {}", rows))
+                .map(rows -> rows.getT2());
+
     }
 
     public Tuple2<String, Tuple> prepareForInsert(T data) {
