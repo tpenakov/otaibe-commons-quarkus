@@ -85,7 +85,7 @@ public class JsonUtils {
                             }
                     ));
         } catch (IOException e) {
-            logger.error("uanble to transform to Map", e);
+            logger.error("unable to transform to Map", e);
             throw new RuntimeException(e);
         }
     }
