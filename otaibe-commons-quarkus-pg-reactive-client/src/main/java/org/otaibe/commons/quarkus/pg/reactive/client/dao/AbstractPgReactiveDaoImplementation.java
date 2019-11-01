@@ -214,11 +214,4 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
         return Tuple.of(getId(entity));
     }
 
-    protected String quoteString(String s) {
-        return new StringBuilder()
-                .append(SINGLE_QUOTE)
-                .append(s)
-                .append(SINGLE_QUOTE)
-                .toString();
-    }
 }
