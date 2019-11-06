@@ -17,6 +17,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -25,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * https://docs.aws.amazon.com/sdk-for-java/v2/developer-guide/welcome.html
@@ -81,14 +83,15 @@ public class StorageProcessor {
     }
 
     public Mono<Object> write(String key, String text) {
-        return Flux.create(fluxSink ->
+        AtomicBoolean isWritten = new AtomicBoolean(false);
+        return Flux.<PutObjectResponse>create(fluxSink ->
                 getS3AsyncClient().putObject(
                         builder -> builder.key(key).bucket(getAwsBucket()),
                         AsyncRequestBody.fromString(text)
                 )
                         .whenComplete((putObjectResponse, throwable) -> {
                             if (putObjectResponse != null) {
-                                fluxSink.next(new Object());
+                                fluxSink.next(putObjectResponse);
                                 fluxSink.complete();
                                 return;
                             }
@@ -96,18 +99,23 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(5, Duration.ofMillis(50), Duration.ofSeconds(2));
+                .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
+                        .then(Mono.just((Object) putObjectResponse))
+                )
+                .retryBackoff(15, Duration.ofMillis(100), Duration.ofSeconds(2))
+                .doOnError(throwable -> log.error("unable to write text with key: " + key, throwable));
     }
 
     public Mono<Object> write(String key, byte[] data) {
-        return Flux.create(fluxSink ->
+        AtomicBoolean isWritten = new AtomicBoolean(false);
+        return Flux.<PutObjectResponse>create(fluxSink ->
                 getS3AsyncClient().putObject(
                         builder -> builder.key(key).bucket(getAwsBucket()),
                         AsyncRequestBody.fromBytes(data)
                 )
                         .whenComplete((putObjectResponse, throwable) -> {
                             if (putObjectResponse != null) {
-                                fluxSink.next(new Object());
+                                fluxSink.next(putObjectResponse);
                                 fluxSink.complete();
                                 return;
                             }
@@ -115,14 +123,19 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(5, Duration.ofMillis(50), Duration.ofSeconds(2));
+                .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
+                        .then(Mono.just((Object) putObjectResponse))
+                )
+                .retryBackoff(15, Duration.ofMillis(100), Duration.ofSeconds(2))
+                .doOnError(throwable -> log.error("unable to write object with key: " + key, throwable));
     }
 
     public Mono<String> read(String key) {
         return readBytes(key)
                 .map(bytes ->
                         software.amazon.awssdk.utils.StringUtils.fromBytes(
-                                bytes, StandardCharsets.UTF_8));
+                                bytes, StandardCharsets.UTF_8))
+                .filter(s -> StringUtils.isNotBlank(s));
     }
 
     public Mono<byte[]> readBytes(String key) {
@@ -158,12 +171,59 @@ public class StorageProcessor {
                                     return;
                                 }
                             }
-                            log.error("unable to read object with key: " + key, throwable);
                             fluxSink.error(throwable);
                         })
         )
                 .next()
-                .retryBackoff(5, Duration.ofMillis(50), Duration.ofSeconds(2));
+                .retryBackoff(25, Duration.ofMillis(50), Duration.ofSeconds(2))
+                .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
+                ;
     }
+
+    public Mono<String> readETag(String key) {
+        return Flux.<String>create(fluxSink ->
+                getS3AsyncClient().headObject(
+                        builder -> builder.key(key).bucket(getAwsBucket())
+                )
+                        .whenComplete((headObjectResponse, throwable) -> {
+                            if (headObjectResponse != null) {
+                                String etag = headObjectResponse.eTag();
+                                if (StringUtils.isNotBlank(etag)) {
+                                    fluxSink.next(etag);
+                                }
+                                fluxSink.complete();
+                                return;
+                            }
+                            if (CompletionException.class.isAssignableFrom(throwable.getClass())) {
+                                Class<? extends Throwable> causeException = ((CompletionException) throwable).getCause().getClass();
+                                if (NoSuchKeyException.class.isAssignableFrom(causeException)) {
+                                    fluxSink.complete();
+                                    return;
+                                }
+                            }
+                            fluxSink.error(throwable);
+                        })
+        )
+                .next()
+                .retryBackoff(25, Duration.ofMillis(50), Duration.ofSeconds(2))
+                .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
+                ;
+
+    }
+
+    Mono<Boolean> ensureWriteMono(String key, AtomicBoolean isWritten, String etag) {
+        return readETag(key)
+                .defaultIfEmpty(StringUtils.EMPTY)
+                .flatMap(s -> {
+                    boolean result = StringUtils.equals(etag, s);
+                    isWritten.set(result);
+                    return result ?
+                            Mono.just(result) : Flux.interval(Duration.ofMillis(50)).next().map(aLong -> result);
+                })
+                .repeat()
+                .filter(aBoolean -> aBoolean)
+                .next();
+    }
+
 
 }
