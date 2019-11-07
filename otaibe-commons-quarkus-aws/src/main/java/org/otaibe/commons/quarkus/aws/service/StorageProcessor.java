@@ -45,6 +45,8 @@ public class StorageProcessor {
     Optional<String> awsRegion;
     @ConfigProperty(name = "cloud.aws.s3OtaIbeBucketRoot")
     String awsBucket1;
+    @ConfigProperty(name = "cloud.aws.storage.processor.ensure.write", defaultValue = "false")
+    Boolean ensureWrite;
 
     @Inject
     JsonUtils jsonUtils;
@@ -66,7 +68,7 @@ public class StorageProcessor {
         s3AsyncClient = s3AsyncClientBuilder.build();
         String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
         awsBucket = StringUtils.substring(strip, 0, StringUtils.length(strip) - 1);
-
+        log.info("initialized ensureWrite={}", getEnsureWrite());
     }
 
     public <T> Mono<T> readObject(String key, Class<T> tClass) {
@@ -103,7 +105,8 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
+                .flatMap(putObjectResponse -> (getEnsureWrite() ?
+                        ensureWriteMono(key, isWritten, putObjectResponse.eTag()) : Mono.just(true))
                         .then(Mono.just((Object) putObjectResponse))
                 )
                 .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
@@ -127,7 +130,8 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
+                .flatMap(putObjectResponse -> (getEnsureWrite() ?
+                        ensureWriteMono(key, isWritten, putObjectResponse.eTag()) : Mono.just(true))
                         .then(Mono.just((Object) putObjectResponse))
                 )
                 .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
