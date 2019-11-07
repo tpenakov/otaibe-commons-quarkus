@@ -37,6 +37,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class StorageProcessor {
 
+    public static final int NUM_RETRIES = 40;
+    public static final int FIRST_DELAY_MILLIS = 10;
+    public static final int MAX_RETRY_DELAY_SECONDS = 1;
+
     @ConfigProperty(name = "cloud.aws.region.static")
     Optional<String> awsRegion;
     @ConfigProperty(name = "cloud.aws.s3OtaIbeBucketRoot")
@@ -102,7 +106,7 @@ public class StorageProcessor {
                 .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
                         .then(Mono.just((Object) putObjectResponse))
                 )
-                .retryBackoff(15, Duration.ofMillis(100), Duration.ofSeconds(2))
+                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
                 .doOnError(throwable -> log.error("unable to write text with key: " + key, throwable));
     }
 
@@ -126,7 +130,7 @@ public class StorageProcessor {
                 .flatMap(putObjectResponse -> ensureWriteMono(key, isWritten, putObjectResponse.eTag())
                         .then(Mono.just((Object) putObjectResponse))
                 )
-                .retryBackoff(15, Duration.ofMillis(100), Duration.ofSeconds(2))
+                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
                 .doOnError(throwable -> log.error("unable to write object with key: " + key, throwable));
     }
 
@@ -175,7 +179,7 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(25, Duration.ofMillis(50), Duration.ofSeconds(2))
+                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
                 .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
                 ;
     }
@@ -205,7 +209,7 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(25, Duration.ofMillis(50), Duration.ofSeconds(2))
+                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
                 .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
                 ;
 
