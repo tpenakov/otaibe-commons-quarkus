@@ -74,13 +74,27 @@ public abstract class ConfigService {
                 //.doOnNext(maps -> log.info("yml config list: {}", getJsonUtils().toStringLazy(maps, getObjectMapper())))
                 .map(maps -> maps
                         .stream()
-                        .reduce(allSettings, (map, map2) -> getMapWrapper().mergeStringObjectMap(map, map2))
+                        .reduce(allSettings, (map, map2) -> {
+                            try {
+                                return getMapWrapper().mergeStringObjectMap(map, map2);
+                            } catch (Exception e) {
+                                log.error("unable to merge maps", e);
+                                log.error("map: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
+                                log.error("map2: {}", getJsonUtils().toStringLazy(map2, getObjectMapper()));
+                                throw new RuntimeException(e);
+                            }
+                        })
                 )
-                .doOnNext(map -> {
+                .map(map -> {
                     //log.info("yml config: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
                     readAllSettings(map);
                     setAllSettings(map);
+                    return true;
+                })
+                .retry(10)
+                .map(aBoolean -> {
                     getIsInitialized().set(true);
+                    return true;
                 })
                 .subscribe();
 
