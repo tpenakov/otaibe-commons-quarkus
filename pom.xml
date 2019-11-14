@@ -24,11 +24,11 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>0.24.0</quarkus.version>
+        <quarkus.version>1.0.0.CR1</quarkus.version>
         <aws.sdk.version>2.9.9</aws.sdk.version>
         <jackson.version>2.9.10</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
-        <vertx.version>3.8.2</vertx.version>
+        <vertx.version>3.8.3</vertx.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
