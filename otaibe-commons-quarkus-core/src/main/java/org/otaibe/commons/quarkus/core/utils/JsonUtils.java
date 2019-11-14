@@ -13,6 +13,7 @@ import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -122,6 +123,10 @@ public class JsonUtils {
         return readValue(value, clazz, getObjectMapper());
     }
 
+    public <T> Optional<T> readValue(InputStream value, Class<T> clazz) {
+        return readValue(value, clazz, getObjectMapper());
+    }
+
     public <T> Optional<T> readValue(String value, Class<T> clazz, ObjectMapper objectMapper1) {
         return Optional.ofNullable(objectMapper1)
                 .map(objectMapper -> {
@@ -135,6 +140,18 @@ public class JsonUtils {
     }
 
     public <T> Optional<T> readValue(byte[] value, Class<T> clazz, ObjectMapper objectMapper1) {
+        return Optional.ofNullable(objectMapper1)
+                .map(objectMapper -> {
+                    try {
+                        return objectMapper.readValue(value, clazz);
+                    } catch (IOException e) {
+                        logger.error("unable to deserialize", e);
+                    }
+                    return null;
+                });
+    }
+
+    public <T> Optional<T> readValue(InputStream value, Class<T> clazz, ObjectMapper objectMapper1) {
         return Optional.ofNullable(objectMapper1)
                 .map(objectMapper -> {
                     try {
