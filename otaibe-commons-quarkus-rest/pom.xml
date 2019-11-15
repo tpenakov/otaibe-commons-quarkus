@@ -36,6 +36,11 @@
             <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.vertx</groupId>
+            <artifactId>vertx-web</artifactId>
+        </dependency>
+
     </dependencies>
 
 </project>

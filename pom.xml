@@ -84,6 +84,11 @@
                 <artifactId>vertx-rx-java2</artifactId>
                 <version>${vertx.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.vertx</groupId>
+                <artifactId>vertx-web</artifactId>
+                <version>${vertx.version}-01</version>
+            </dependency>
 
             <dependency>
                 <groupId>javax.persistence</groupId>
