@@ -40,7 +40,9 @@ public class ControllerUtils {
                     .doOnNext(objects -> Optional.ofNullable(objects.getT1())
                             .filter(t -> isValid.apply(t))
                             .map(t -> {
-                                rc.response().end(getJsonUtils().toStringLazy(t).toString());
+                                String body = String.class.isAssignableFrom(t.getClass()) ?
+                                        (String) t : getJsonUtils().toStringLazy(t).toString();
+                                rc.response().end(body);
                                 return true;
                             })
                             .orElseGet(() -> {
