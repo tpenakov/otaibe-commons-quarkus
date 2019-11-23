@@ -14,7 +14,10 @@ import java.util.zip.GZIPInputStream;
 @ApplicationScoped
 public class ZipUtils {
     public String gunZip(byte[] data) throws Exception {
-        InputStream inputStream = new GZIPInputStream(new ByteArrayInputStream(data));
-        return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(data)) {
+            try (InputStream inputStream = new GZIPInputStream(byteArrayInputStream)){
+                return IOUtils.toString(inputStream, StandardCharsets.UTF_8);
+            }
+        }
     }
 }

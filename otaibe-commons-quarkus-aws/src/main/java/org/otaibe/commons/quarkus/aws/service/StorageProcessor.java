@@ -109,6 +109,7 @@ public class StorageProcessor {
                         ensureWriteMono(key, isWritten, putObjectResponse.eTag()) : Mono.just(true))
                         .then(Mono.just((Object) putObjectResponse))
                 )
+                .doOnError(throwable -> log.trace("unable to write text (before retry) with key: " + key, throwable))
                 .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
                 .doOnError(throwable -> log.error("unable to write text with key: " + key, throwable));
     }
@@ -134,8 +135,9 @@ public class StorageProcessor {
                         ensureWriteMono(key, isWritten, putObjectResponse.eTag()) : Mono.just(true))
                         .then(Mono.just((Object) putObjectResponse))
                 )
+                .doOnError(throwable -> log.trace("unable to write bytes (before retry) with key: " + key, throwable))
                 .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
-                .doOnError(throwable -> log.error("unable to write object with key: " + key, throwable));
+                .doOnError(throwable -> log.error("unable to write bytes with key: " + key, throwable));
     }
 
     public Mono<String> read(String key) {
@@ -179,6 +181,7 @@ public class StorageProcessor {
                                     return;
                                 }
                             }
+                            log.trace("unable to readBytes (before retry)", throwable);
                             fluxSink.error(throwable);
                         })
         )
@@ -209,6 +212,7 @@ public class StorageProcessor {
                                     return;
                                 }
                             }
+                            log.trace("unable to readETag (before retry)", throwable);
                             fluxSink.error(throwable);
                         })
         )

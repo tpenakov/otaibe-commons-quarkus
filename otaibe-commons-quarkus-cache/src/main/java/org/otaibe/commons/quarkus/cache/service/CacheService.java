@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @Setter(AccessLevel.PACKAGE)
 @Slf4j
 public class CacheService<KEY, VALUE> {
+    public static final String UNKNOWN = "UNKNOWN";
     private AtomicInteger numInCache;
 
     @Getter(AccessLevel.PRIVATE)
@@ -52,7 +53,29 @@ public class CacheService<KEY, VALUE> {
                     .retry()
                     .doOnNext(aLong -> {
                         LocalDateTime threshold = LocalDateTime.now().minus(getDurationFunction().apply(getDuration()));
+                        log.debug("will clear cache by duration. numItems={}, maxInCache={}, firstDate={}, threshold={}",
+                                getNumInCache().get(),
+                                getMaxNumInCache(),
+                                Optional.ofNullable(getMaxNumInCache())
+                                .map(integer -> getCacheKeyQueue().peek())
+                                .map(key -> getCache().get(key))
+                                .map(valueCacheTimeEntry -> valueCacheTimeEntry.getDateTime())
+                                .map(dateTime -> dateTime.toString())
+                                .orElse(UNKNOWN),
+                                threshold
+                        );
                         clearByDateTime(threshold);
+                        log.debug("cleared cache by duration. numItems={}, maxInCache={}, firstDate={}, threshold={}",
+                                getNumInCache().get(),
+                                getMaxNumInCache(),
+                                Optional.ofNullable(getMaxNumInCache())
+                                        .map(integer -> getCacheKeyQueue().peek())
+                                        .map(key -> getCache().get(key))
+                                        .map(valueCacheTimeEntry -> valueCacheTimeEntry.getDateTime())
+                                        .map(dateTime -> dateTime.toString())
+                                        .orElse(UNKNOWN),
+                                threshold
+                        );
                     })
                     .subscribe();
         }
@@ -81,19 +104,26 @@ public class CacheService<KEY, VALUE> {
         if (isNotInCache) {
             int num = getNumInCache().incrementAndGet();
             if (getMaxNumInCache() != null) {
-                getCacheKeyQueue().add(key);
                 if (num > getMaxNumInCache()) {
                     KEY key1 = getCacheKeyQueue().poll();
                     removeFromCacheOnly(key1);
                 }
+                getCacheKeyQueue().add(key);
             }
         }
+        log.debug("put completed: wasNotInCache={} MaxNumInCache={} approxNumInCache={}, numInCache={}",
+                isNotInCache,
+                getMaxNumInCache(),
+                getCache().keySet().size(),
+                getNumInCache().get()
+                );
         return value;
     }
 
     public void remove(KEY key) {
         if (getCacheKeyQueue() != null) {
-            getCacheKeyQueue().remove(key);
+            boolean result = getCacheKeyQueue().remove(key);
+            log.debug("removed key={}, result={}", key, result);
         }
         removeFromCacheOnly(key);
     }
@@ -107,8 +137,13 @@ public class CacheService<KEY, VALUE> {
     }
 
     private void removeFromCacheOnly(KEY key) {
-        getCache().remove(key);
-        getNumInCache().decrementAndGet();
+        CacheTimeEntry<VALUE> entry = getCache().remove(key);
+        int numLeft = getNumInCache().decrementAndGet();
+        log.debug("removed key={}, dateTime={}, numLeft={}",
+                key,
+                Optional.ofNullable(entry).map(CacheTimeEntry::getDateTime),
+                numLeft
+        );
     }
 
     @Builder
