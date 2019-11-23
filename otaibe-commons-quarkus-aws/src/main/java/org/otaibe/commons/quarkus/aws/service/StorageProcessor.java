@@ -72,7 +72,7 @@ public class StorageProcessor {
     }
 
     public <T> Mono<T> readObject(String key, Class<T> tClass) {
-        return read(key)
+        return readBytes(key)
                 .doOnSubscribe(subscription -> log.trace("readObject {} {}", key, tClass.getSimpleName()))
                 .map(s -> getJsonUtils().readValue(s, tClass, getObjectMapper()))
                 .doOnNext(t -> {
