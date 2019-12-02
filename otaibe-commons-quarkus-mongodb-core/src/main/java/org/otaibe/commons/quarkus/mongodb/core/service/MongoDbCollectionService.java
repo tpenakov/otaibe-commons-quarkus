@@ -60,6 +60,10 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
         return getBsonUtils().fromMap(map, clazz, getPojoCodecRegistry());
     }
 
+    public Mono<T> findByIdPretty(String idPretty) {
+        return Mono.from(getCollection().find(Filters.eq(IdEntity.ID, new ObjectId(idPretty))));
+    }
+
     /**
      * find all Objects that contains the not null fields from the template param
      *
