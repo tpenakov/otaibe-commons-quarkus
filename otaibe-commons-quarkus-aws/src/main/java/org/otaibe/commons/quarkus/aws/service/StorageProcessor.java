@@ -13,6 +13,7 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
@@ -43,6 +44,8 @@ public class StorageProcessor {
 
     @ConfigProperty(name = "cloud.aws.region.static")
     Optional<String> awsRegion;
+    @ConfigProperty(name = "cloud.aws.num.threads")
+    Optional<Integer> numThreads;
     @ConfigProperty(name = "cloud.aws.s3OtaIbeBucketRoot")
     String awsBucket1;
     @ConfigProperty(name = "cloud.aws.storage.processor.ensure.write", defaultValue = "false")
@@ -58,17 +61,22 @@ public class StorageProcessor {
 
     @PostConstruct
     public void init() {
-
-        S3AsyncClientBuilder s3AsyncClientBuilder = S3AsyncClient.builder()
-                .httpClientBuilder(NettyNioAsyncHttpClient.builder()
-                        .maxConcurrency(100)
-                        .maxPendingConnectionAcquires(10_000))
-                .credentialsProvider(DefaultCredentialsProvider.create());
+        S3AsyncClientBuilder s3AsyncClientBuilder = createS3AsyncClientBuilder();
         awsRegion.ifPresent(s -> s3AsyncClientBuilder.region(Region.of(s)));
         s3AsyncClient = s3AsyncClientBuilder.build();
         String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
         awsBucket = StringUtils.substring(strip, 0, StringUtils.length(strip) - 1);
         log.info("initialized ensureWrite={}", getEnsureWrite());
+    }
+
+    protected S3AsyncClientBuilder createS3AsyncClientBuilder() {
+        return S3AsyncClient.builder()
+                .httpClientBuilder(NettyNioAsyncHttpClient.builder()
+                        .maxConcurrency(100)
+                        .maxPendingConnectionAcquires(10_000)
+                        .eventLoopGroupBuilder(SdkEventLoopGroup.builder().numberOfThreads(getNumThreads().orElse(10)))
+                )
+                .credentialsProvider(DefaultCredentialsProvider.create());
     }
 
     public <T> Mono<T> readObject(String key, Class<T> tClass) {

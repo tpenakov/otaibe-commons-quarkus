@@ -25,7 +25,7 @@
 
     <properties>
         <quarkus.version>1.0.0.CR1</quarkus.version>
-        <aws.sdk.version>2.9.9</aws.sdk.version>
+        <aws.sdk.version>2.10.30</aws.sdk.version>
         <jackson.version>2.9.10</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
         <vertx.version>3.8.3</vertx.version>
