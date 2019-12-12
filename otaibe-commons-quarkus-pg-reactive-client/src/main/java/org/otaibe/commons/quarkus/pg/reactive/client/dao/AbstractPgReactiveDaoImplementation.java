@@ -1,7 +1,7 @@
 package org.otaibe.commons.quarkus.pg.reactive.client.dao;
 
-import io.reactiverse.reactivex.pgclient.Row;
-import io.reactiverse.reactivex.pgclient.Tuple;
+import io.vertx.reactivex.sqlclient.Row;
+import io.vertx.reactivex.sqlclient.Tuple;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -36,7 +36,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     public static final String FIND_BY_ID = "{0} WHERE {1}=$1";
 
     @Inject
-    io.reactiverse.reactivex.pgclient.PgPool client;
+    io.vertx.reactivex.pgclient.PgPool client;
     @Inject
     JsonConfig jsonConfig;
     @Inject
@@ -61,13 +61,18 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
     @PostConstruct
     public void init() {
+        log.info("init started");
+        T dummyEntityWithAllFields = createDummyEntityWithAllFields();
+        //log.info("init dummyEntityWithAllFields={}", dummyEntityWithAllFields);
         Map<String, Object> entity = getJsonUtils().toMap(
-                createDummyEntityWithAllFields(),
+                dummyEntityWithAllFields,
                 getJsonConfig().getDbPropsNamesMapper());
+        //log.info("init entity={}", entity);
         allColumnsHeader = StringUtils.join(entity.keySet(), COMMA);
         fillSelectFromSql();
         fillDeleteByIdTemplate();
         fillFindByIdTemplate();
+        log.info("init completed");
     }
 
     public Mono<Boolean> deleteById(T data) {
@@ -192,7 +197,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
         Object nextValues1[] = ArrayUtils.clone(nextValues);
 
         Tuple tuple = Optional.ofNullable(nextValues)
-                .map(objects -> new Tuple(io.reactiverse.pgclient.Tuple.of(firstValue, nextValues1)))
+                .map(objects -> new Tuple(io.vertx.sqlclient.Tuple.of(firstValue, nextValues1)))
                 .orElseGet(() -> Tuple.of(firstValue));
         return Tuples.of(sql, tuple);
 
