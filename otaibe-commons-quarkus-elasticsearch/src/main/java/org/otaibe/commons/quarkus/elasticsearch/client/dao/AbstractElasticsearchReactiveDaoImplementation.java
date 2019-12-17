@@ -14,11 +14,16 @@ import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.client.*;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.elasticsearch.client.service.AbstractElasticsearchService;
 import reactor.core.publisher.Flux;
@@ -28,6 +33,8 @@ import javax.inject.Inject;
 import javax.ws.rs.HttpMethod;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,6 +45,12 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final char COMMA = ',';
     public static final String SINGLE_QUOTE = "'";
     public static final String DELETED = "DELETED";
+    public static final String TYPE = "type";
+    public static final String TEXT = "text";
+    public static final String ANALYZER = "analyzer";
+    public static final String KEYWORD = "keyword";
+    public static final String PROPERTIES = "properties";
+    public static final String DATE = "date";
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -127,6 +140,45 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                 ;
     }
 
+    protected Flux<T> findByMatch(String fieldName, String value) {
+        SearchRequest searchRequest = new SearchRequest(getTableName());
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
+        searchRequest.source(searchSourceBuilder);
+
+        return search(searchRequest);
+    }
+
+    protected Flux<T> findByExactMatch(String fieldName, String value) {
+        SearchRequest searchRequest = new SearchRequest(getTableName());
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.termQuery(fieldName, value));
+        searchRequest.source(searchSourceBuilder);
+
+        return search(searchRequest);
+    }
+
+    protected Flux<T> search(SearchRequest searchRequest) {
+        return Flux.create(fluxSink -> getRestClient().searchAsync(searchRequest, RequestOptions.DEFAULT, new ActionListener<SearchResponse>() {
+            @Override
+            public void onResponse(SearchResponse searchResponse) {
+                SearchHits hits = searchResponse.getHits();
+                Arrays.stream(hits.getHits()).forEach(fields -> {
+                    Map<String, Object> map = fields.getSourceAsMap();
+                    T t = getJsonUtils().fromMap(map, getEntityClass());
+                    fluxSink.next(t);
+                });
+                fluxSink.complete();
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                log.error("search failed", e);
+                fluxSink.error(new RuntimeException(e));
+            }
+        }));
+    }
+
     public Mono<T> save(T data) {
 
         return Mono.just(data)
@@ -160,6 +212,23 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                             .next();
                 })
                 ;
+    }
+
+    protected Map<String, Object> getKeywordTextAnalizer() {
+        return getTextAnalizer(KEYWORD);
+    }
+
+    protected Map<String, Object> getTextAnalizer(String analyzer) {
+        Map<String, Object> result = new HashMap<>();
+        result.put(TYPE, TEXT);
+        result.put(ANALYZER, analyzer);
+        return result;
+    }
+
+    protected Map<String, Object> getDateFieldType() {
+        Map<String, Object> result = new HashMap<>();
+        result.put(TYPE, DATE);
+        return result;
     }
 
     protected Mono<Boolean> createIndex() {
