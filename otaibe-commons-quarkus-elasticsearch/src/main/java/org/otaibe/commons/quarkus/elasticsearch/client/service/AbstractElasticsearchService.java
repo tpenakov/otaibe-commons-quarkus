@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Should be overriden in the project where is used in order to properly init and shutdown the client
+ * Should be overridden in the project where is used in order to properly init and shutdown the client
  */
 @Getter
 @Setter
