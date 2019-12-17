@@ -19,6 +19,7 @@
         <module>otaibe-commons-quarkus-web-client</module>
         <module>otaibe-commons-quarkus-pg-reactive-client</module>
         <module>otaibe-commons-quarkus-cache</module>
+        <module>otaibe-commons-quarkus-elasticsearch</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
