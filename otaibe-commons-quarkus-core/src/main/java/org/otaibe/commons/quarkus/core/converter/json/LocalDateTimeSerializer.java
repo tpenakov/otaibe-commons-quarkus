@@ -1,4 +1,4 @@
-package org.otaibe.commons.quarkus.pg.reactive.client.converter.json;
+package org.otaibe.commons.quarkus.core.converter.json;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.SerializerProvider;

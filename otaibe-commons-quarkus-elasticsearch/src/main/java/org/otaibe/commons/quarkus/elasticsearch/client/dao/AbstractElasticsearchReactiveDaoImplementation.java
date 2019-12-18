@@ -51,6 +51,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String KEYWORD = "keyword";
     public static final String PROPERTIES = "properties";
     public static final String DATE = "date";
+    public static final String FORMAT = "format";
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -228,6 +229,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     protected Map<String, Object> getDateFieldType() {
         Map<String, Object> result = new HashMap<>();
         result.put(TYPE, DATE);
+        result.put(FORMAT, "strict_date_time||epoch_second||epoch_millis");
         return result;
     }
 

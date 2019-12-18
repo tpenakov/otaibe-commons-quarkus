@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.otaibe.commons.quarkus.pg.reactive.client.converter.json.LocalDateTimeSerializer;
+import org.otaibe.commons.quarkus.core.converter.json.LocalDateTimeSerializer;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
