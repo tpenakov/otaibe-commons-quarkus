@@ -43,6 +43,7 @@ import java.util.UUID;
 @Slf4j
 public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final char COMMA = ',';
+    public static final char DOT = '.';
     public static final String SINGLE_QUOTE = "'";
     public static final String DELETED = "DELETED";
     public static final String TYPE = "type";
@@ -52,6 +53,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String PROPERTIES = "properties";
     public static final String DATE = "date";
     public static final String FORMAT = "format";
+    public static final String LONG = "long";
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -142,21 +144,39 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     }
 
     protected Flux<T> findByMatch(String fieldName, String value) {
-        SearchRequest searchRequest = new SearchRequest(getTableName());
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-        searchSourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
-        searchRequest.source(searchSourceBuilder);
-
+        SearchRequest searchRequest = getSearchRequestByMatch(fieldName, value);
         return search(searchRequest);
     }
 
-    protected Flux<T> findByExactMatch(String fieldName, String value) {
+    protected SearchRequest getSearchRequestByMatch(String fieldName, String value) {
         SearchRequest searchRequest = new SearchRequest(getTableName());
+        SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByMatch(fieldName, value);
+        searchRequest.source(searchSourceBuilder);
+        return searchRequest;
+    }
+
+    protected SearchSourceBuilder getSearchSourceBuilderByMatch(String fieldName, String value) {
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
+        return searchSourceBuilder;
+    }
+
+    protected Flux<T> findByExactMatch(String fieldName, String value) {
+        SearchRequest searchRequest = getSearchRequestByExactMatch(fieldName, value);
+        return search(searchRequest);
+    }
+
+    protected SearchRequest getSearchRequestByExactMatch(String fieldName, String value) {
+        SearchRequest searchRequest = new SearchRequest(getTableName());
+        SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByExactMatch(fieldName, value);
+        searchRequest.source(searchSourceBuilder);
+        return searchRequest;
+    }
+
+    protected SearchSourceBuilder getSearchSourceBuilderByExactMatch(String fieldName, String value) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.termQuery(fieldName, value));
-        searchRequest.source(searchSourceBuilder);
-
-        return search(searchRequest);
+        return searchSourceBuilder;
     }
 
     protected Flux<T> search(SearchRequest searchRequest) {
@@ -230,6 +250,12 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         Map<String, Object> result = new HashMap<>();
         result.put(TYPE, DATE);
         result.put(FORMAT, "strict_date_time||epoch_second||epoch_millis");
+        return result;
+    }
+
+    protected Map<String, Object> getLongFieldType() {
+        Map<String, Object> result = new HashMap<>();
+        result.put(TYPE, LONG);
         return result;
     }
 
