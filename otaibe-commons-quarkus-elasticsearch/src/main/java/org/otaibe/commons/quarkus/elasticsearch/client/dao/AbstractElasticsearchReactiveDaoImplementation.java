@@ -21,6 +21,7 @@ import org.elasticsearch.client.*;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -33,10 +34,7 @@ import javax.inject.Inject;
 import javax.ws.rs.HttpMethod;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 @Getter
 @Setter
@@ -70,6 +68,10 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     protected abstract String getTableName();
 
     protected abstract Class<T> getEntityClass();
+
+    protected abstract Long getVersion(T entity);
+
+    protected abstract void setVersion(T entity, Long version);
 
     public void init() {
         log.info("init started");
@@ -208,31 +210,41 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                         setId(t, UUID.randomUUID().toString());
                     }
 
-                    IndexRequest indexRequest = new IndexRequest(getTableName());
-                    indexRequest.source(getJsonUtils().toStringLazy(t).toString(), XContentType.JSON);
-                    indexRequest.id(getId(t));
-                    indexRequest.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
+                    IndexRequest request = new IndexRequest(getTableName());
+                    request.id(getId(t));
+                    request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
 
-                    return Flux
-                            .<T>create(fluxSink -> {
-                                getRestClient().indexAsync(indexRequest, RequestOptions.DEFAULT, new ActionListener<IndexResponse>() {
-                                    @Override
-                                    public void onResponse(IndexResponse indexResponse) {
-                                        log.info("save result: {}", indexResponse);
-                                        fluxSink.next(t);
-                                        fluxSink.complete();
-                                    }
+                    Long versionNum = Optional.ofNullable(getVersion(t))
+                            .map(aLong -> aLong + 1)
+                            .orElse(0l);
+                    request.version(versionNum);
+                    request.versionType(VersionType.EXTERNAL);
+                    setVersion(t, versionNum);
 
-                                    @Override
-                                    public void onFailure(Exception e) {
-                                        log.error("unable to save", e);
-                                        fluxSink.error(new RuntimeException(e));
-                                    }
-                                });
-                            })
+                    return Mono.just(getJsonUtils().toStringLazy(t).toString())
+                            .flatMapMany(s -> Flux.<T>create(fluxSink -> {
+                                        request.source(s, XContentType.JSON);
+                                        getRestClient().indexAsync(
+                                                request,
+                                                RequestOptions.DEFAULT,
+                                                new ActionListener<IndexResponse>() {
+                                                    @Override
+                                                    public void onResponse(IndexResponse response) {
+                                                        log.debug("save result: {}", response);
+                                                        fluxSink.next(t);
+                                                        fluxSink.complete();
+                                                    }
+
+                                                    @Override
+                                                    public void onFailure(Exception e) {
+                                                        log.error("unable to save", e);
+                                                        fluxSink.error(new RuntimeException(e));
+                                                    }
+                                                });
+                                    })
+                            )
                             .next();
-                })
-                ;
+                });
     }
 
     protected Map<String, Object> getKeywordTextAnalizer() {
