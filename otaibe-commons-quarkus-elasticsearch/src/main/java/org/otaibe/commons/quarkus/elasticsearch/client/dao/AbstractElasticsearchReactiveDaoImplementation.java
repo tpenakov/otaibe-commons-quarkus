@@ -17,11 +17,16 @@ import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.WriteRequest;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.*;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
+import org.elasticsearch.index.get.GetResult;
+import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
@@ -35,6 +40,8 @@ import javax.ws.rs.HttpMethod;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 @Getter
 @Setter
@@ -52,6 +59,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String DATE = "date";
     public static final String FORMAT = "format";
     public static final String LONG = "long";
+    public static final String BOOLEAN = "boolean";
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -145,37 +153,69 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                 ;
     }
 
-    protected Flux<T> findByMatch(String fieldName, String value) {
+    protected Flux<T> findByMatch(Map<String, Object> map) {
+        BoolQueryBuilder query = QueryBuilders.boolQuery();
+        return findBy(map, query,
+                queryBuilder -> query.should(queryBuilder),
+                (s, o) -> getSearchSourceBuilderByMatch(s, o));
+    }
+
+    protected Flux<T> findByMatch(String fieldName, Object value) {
         SearchRequest searchRequest = getSearchRequestByMatch(fieldName, value);
         return search(searchRequest);
     }
 
-    protected SearchRequest getSearchRequestByMatch(String fieldName, String value) {
+    protected SearchRequest getSearchRequestByMatch(String fieldName, Object value) {
         SearchRequest searchRequest = new SearchRequest(getTableName());
         SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByMatch(fieldName, value);
         searchRequest.source(searchSourceBuilder);
         return searchRequest;
     }
 
-    protected SearchSourceBuilder getSearchSourceBuilderByMatch(String fieldName, String value) {
+    protected SearchSourceBuilder getSearchSourceBuilderByMatch(String fieldName, Object value) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
         return searchSourceBuilder;
     }
 
-    protected Flux<T> findByExactMatch(String fieldName, String value) {
+    protected Flux<T> findByExactMatch(Map<String, Object> map) {
+        BoolQueryBuilder query = QueryBuilders.boolQuery();
+        return findBy(map, query,
+                queryBuilder -> query.must(queryBuilder),
+                (s, o) -> getSearchSourceBuilderByExactMatch(s, o));
+    }
+
+    protected Flux<T> findBy(Map<String, Object> map,
+                             BoolQueryBuilder query,
+                             Function<QueryBuilder, BoolQueryBuilder> fn,
+                             BiFunction<String, Object, SearchSourceBuilder> fn1
+    ) {
+        SearchRequest searchRequest = new SearchRequest(getTableName());
+        SearchSourceBuilder searchSourceBuilder1 = new SearchSourceBuilder();
+        searchSourceBuilder1.query(query);
+        searchRequest.source(searchSourceBuilder1);
+        map.entrySet().stream()
+                .filter(entry -> StringUtils.isNotBlank(entry.getKey()) && entry.getValue() != null)
+                .map(entry -> fn1.apply(entry.getKey(), entry.getValue()))
+                .map(searchSourceBuilder -> searchSourceBuilder.query())
+                .forEach(queryBuilder -> fn.apply(queryBuilder));
+
+        return search(searchRequest);
+    }
+
+    protected Flux<T> findByExactMatch(String fieldName, Object value) {
         SearchRequest searchRequest = getSearchRequestByExactMatch(fieldName, value);
         return search(searchRequest);
     }
 
-    protected SearchRequest getSearchRequestByExactMatch(String fieldName, String value) {
+    protected SearchRequest getSearchRequestByExactMatch(String fieldName, Object value) {
         SearchRequest searchRequest = new SearchRequest(getTableName());
         SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByExactMatch(fieldName, value);
         searchRequest.source(searchSourceBuilder);
         return searchRequest;
     }
 
-    protected SearchSourceBuilder getSearchSourceBuilderByExactMatch(String fieldName, String value) {
+    protected SearchSourceBuilder getSearchSourceBuilderByExactMatch(String fieldName, Object value) {
         SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.termQuery(fieldName, value));
         return searchSourceBuilder;
@@ -247,6 +287,52 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                 });
     }
 
+    public Mono<T> update(T data) {
+
+        if (data == null) {
+            return Mono.empty();
+        }
+
+        String id = getId(data);
+
+        if (StringUtils.isBlank(id)) {
+            return Mono.error(new RuntimeException("id is blank"));
+        }
+
+        UpdateRequest request = new UpdateRequest(getTableName(), id);
+        request.doc(getJsonUtils().toStringLazy(data).toString(), XContentType.JSON);
+        request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
+        request.retryOnConflict(5);
+        request.fetchSource(true);
+
+        return Flux.<T>create(fluxSink -> {
+            getRestClient().updateAsync(request, RequestOptions.DEFAULT, new ActionListener<UpdateResponse>() {
+                @Override
+                public void onResponse(UpdateResponse response) {
+                    GetResult result = response.getGetResult();
+                    if (result.isExists() && !result.isSourceEmpty()) {
+                        String sourceAsString = result.sourceAsString();
+                        getJsonUtils().readValue(sourceAsString, getEntityClass())
+                                .ifPresent(t -> {
+                                    setVersion(t, response.getVersion());
+                                    fluxSink.next(t);
+                                });
+                    }
+                    fluxSink.complete();
+                }
+
+                @Override
+                public void onFailure(Exception e) {
+                    log.error("unable to update", e);
+                    fluxSink.error(new RuntimeException(e));
+                }
+            });
+        })
+                .next()
+                .flatMap(t -> save(t)) //ugly hack in order to update version number in db
+                ;
+    }
+
     protected Map<String, Object> getKeywordTextAnalizer() {
         return getTextAnalizer(KEYWORD);
     }
@@ -268,6 +354,12 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     protected Map<String, Object> getLongFieldType() {
         Map<String, Object> result = new HashMap<>();
         result.put(TYPE, LONG);
+        return result;
+    }
+
+    protected Map<String, Object> getBooleanFieldType() {
+        Map<String, Object> result = new HashMap<>();
+        result.put(TYPE, BOOLEAN);
         return result;
     }
 
