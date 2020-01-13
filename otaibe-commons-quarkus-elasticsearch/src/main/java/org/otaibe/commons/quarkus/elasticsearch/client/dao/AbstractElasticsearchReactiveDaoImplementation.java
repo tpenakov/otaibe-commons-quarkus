@@ -90,7 +90,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                 .flatMap(aBoolean -> createIndex())
                 .doOnNext(aBoolean -> log.info("index {} created={}", getTableName(), aBoolean))
                 .doOnTerminate(() -> log.info("init completed"))
-                .subscribe()
+                .block()
         ;
     }
 
