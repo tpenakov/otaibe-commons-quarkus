@@ -30,6 +30,7 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortOrder;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.elasticsearch.client.service.AbstractElasticsearchService;
 import reactor.core.publisher.Flux;
@@ -60,6 +61,9 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String FORMAT = "format";
     public static final String LONG = "long";
     public static final String BOOLEAN = "boolean";
+    public static final String FROM = "from";
+    public static final String SIZE = "size";
+    public static final String SORT = "sort";
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -222,24 +226,43 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     }
 
     protected Flux<T> search(SearchRequest searchRequest) {
-        return Flux.create(fluxSink -> getRestClient().searchAsync(searchRequest, RequestOptions.DEFAULT, new ActionListener<SearchResponse>() {
-            @Override
-            public void onResponse(SearchResponse searchResponse) {
-                SearchHits hits = searchResponse.getHits();
-                Arrays.stream(hits.getHits()).forEach(fields -> {
-                    Map<String, Object> map = fields.getSourceAsMap();
-                    T t = getJsonUtils().fromMap(map, getEntityClass());
-                    fluxSink.next(t);
-                });
-                fluxSink.complete();
-            }
+        return Mono.subscriberContext()
+                .map(context -> {
+                    SearchSourceBuilder builder = searchRequest.source();
+                    context.<Integer>getOrEmpty(FROM)
+                            .ifPresent(integer -> builder.from(integer));
+                    context.<Integer>getOrEmpty(SIZE)
+                            .ifPresent(integer -> builder.size(integer));
+                    context.<Map<String, SortOrder>>getOrEmpty(SORT)
+                            .ifPresent(map -> map
+                                    .entrySet()
+                                    .forEach(entry -> builder.sort(entry.getKey(), entry.getValue())));
+                    return context;
+                })
+                .flatMapMany(context ->
+                        Flux.create(fluxSink -> getRestClient().searchAsync(
+                                searchRequest,
+                                RequestOptions.DEFAULT,
+                                new ActionListener<SearchResponse>() {
+                                    @Override
+                                    public void onResponse(SearchResponse searchResponse) {
+                                        SearchHits hits = searchResponse.getHits();
+                                        Arrays.stream(hits.getHits()).forEach(fields -> {
+                                            Map<String, Object> map = fields.getSourceAsMap();
+                                            T t = getJsonUtils().fromMap(map, getEntityClass());
+                                            fluxSink.next(t);
+                                        });
+                                        fluxSink.complete();
+                                    }
 
-            @Override
-            public void onFailure(Exception e) {
-                log.error("search failed", e);
-                fluxSink.error(new RuntimeException(e));
-            }
-        }));
+                                    @Override
+                                    public void onFailure(Exception e) {
+                                        log.error("search failed", e);
+                                        fluxSink.error(new RuntimeException(e));
+                                    }
+                                })
+                        )
+                );
     }
 
     public Mono<T> save(T data) {
