@@ -14,14 +14,14 @@ import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
-import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.*;
 import org.elasticsearch.action.support.WriteRequest;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.*;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.get.GetResult;
@@ -30,11 +30,13 @@ import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
-import org.elasticsearch.search.sort.SortOrder;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
+import org.otaibe.commons.quarkus.elasticsearch.client.domain.EsMetadata;
 import org.otaibe.commons.quarkus.elasticsearch.client.service.AbstractElasticsearchService;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 import javax.inject.Inject;
 import javax.ws.rs.HttpMethod;
@@ -61,9 +63,8 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String FORMAT = "format";
     public static final String LONG = "long";
     public static final String BOOLEAN = "boolean";
-    public static final String FROM = "from";
-    public static final String SIZE = "size";
-    public static final String SORT = "sort";
+    public static final String METADATA = "metadata";
+    public static final TimeValue SCROLL_KEEP_ALIVE = TimeValue.timeValueMinutes(1);
 
     @Inject
     AbstractElasticsearchService abstractElasticsearchService;
@@ -104,6 +105,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                 .flatMap(s -> Flux
                         .<Boolean>create(fluxSink -> {
                             DeleteRequest request = new DeleteRequest(getTableName(), s);
+                            request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
                             getRestClient().deleteAsync(request, RequestOptions.DEFAULT, new ActionListener<DeleteResponse>() {
                                 @Override
                                 public void onResponse(DeleteResponse deleteResponse) {
@@ -229,40 +231,100 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         return Mono.subscriberContext()
                 .map(context -> {
                     SearchSourceBuilder builder = searchRequest.source();
-                    context.<Integer>getOrEmpty(FROM)
-                            .ifPresent(integer -> builder.from(integer));
-                    context.<Integer>getOrEmpty(SIZE)
-                            .ifPresent(integer -> builder.size(integer));
-                    context.<Map<String, SortOrder>>getOrEmpty(SORT)
-                            .ifPresent(map -> map
-                                    .entrySet()
-                                    .forEach(entry -> builder.sort(entry.getKey(), entry.getValue())));
+                    context.<EsMetadata>getOrEmpty(METADATA).ifPresent(esMetadata -> {
+                        Optional.ofNullable(esMetadata.getQuery()).ifPresent(query -> {
+                            Optional.ofNullable(query.getFrom())
+                                    .ifPresent(integer -> builder.from(integer));
+                            Optional.ofNullable(query.getSize())
+                                    .ifPresent(integer -> builder.size(integer));
+                            Optional.ofNullable(query.getSort())
+                                    .ifPresent(map -> map
+                                            .entrySet()
+                                            .forEach(entry -> builder.sort(entry.getKey(), entry.getValue())));
+                            Optional.ofNullable(query.getAskForScrollId())
+                                    .filter(Boolean::booleanValue)
+                                    .ifPresent(aBoolean -> {
+                                        searchRequest.scroll(SCROLL_KEEP_ALIVE);
+                                    });
+                        });
+                    });
                     return context;
                 })
                 .flatMapMany(context ->
                         Flux.create(fluxSink -> getRestClient().searchAsync(
                                 searchRequest,
                                 RequestOptions.DEFAULT,
-                                new ActionListener<SearchResponse>() {
-                                    @Override
-                                    public void onResponse(SearchResponse searchResponse) {
-                                        SearchHits hits = searchResponse.getHits();
-                                        Arrays.stream(hits.getHits()).forEach(fields -> {
-                                            Map<String, Object> map = fields.getSourceAsMap();
-                                            T t = getJsonUtils().fromMap(map, getEntityClass());
-                                            fluxSink.next(t);
-                                        });
-                                        fluxSink.complete();
-                                    }
-
-                                    @Override
-                                    public void onFailure(Exception e) {
-                                        log.error("search failed", e);
-                                        fluxSink.error(new RuntimeException(e));
-                                    }
-                                })
+                                searchResponseAction(context, fluxSink))
                         )
                 );
+    }
+
+    public Flux<T> search(SearchScrollRequest searchRequest) {
+        searchRequest.scroll(SCROLL_KEEP_ALIVE);
+        return Mono.subscriberContext()
+                .flatMapMany(context ->
+                        Flux.<T>create(fluxSink -> getRestClient().scrollAsync(
+                                searchRequest,
+                                RequestOptions.DEFAULT,
+                                searchResponseAction(context, (FluxSink<T>) fluxSink))
+                        )
+                )
+                .doOnTerminate(() -> clearScroll(searchRequest.scrollId()))
+                ;
+    }
+
+    protected ActionListener<SearchResponse> searchResponseAction(Context context, FluxSink<T> fluxSink) {
+        return new ActionListener<SearchResponse>() {
+            @Override
+            public void onResponse(SearchResponse searchResponse) {
+                SearchHits hits = searchResponse.getHits();
+                context.<EsMetadata>getOrEmpty(METADATA).ifPresent(metadata1 -> {
+                    EsMetadata.EsDaoMetadata metadata = new EsMetadata.EsDaoMetadata();
+                    metadata1.getDaoMap().put(getTableName(), metadata);
+
+                    String scrollId = searchResponse.getScrollId();
+                    boolean haveScrollId = StringUtils.isNotBlank(scrollId);
+                    if (haveScrollId && hits.getHits().length == 0) {
+                        clearScroll(scrollId);
+                        metadata.setScrollId(null);
+                    } else {
+                        metadata.setScrollId(haveScrollId ? scrollId : null);
+                    }
+
+                    Optional.ofNullable(hits.getTotalHits())
+                            .map(totalHits -> totalHits.value)
+                            .ifPresent(aLong -> metadata.setTotalResults(aLong));
+                });
+                Arrays.stream(hits.getHits()).forEach(fields -> {
+                    Map<String, Object> map = fields.getSourceAsMap();
+                    T t = getJsonUtils().fromMap(map, getEntityClass());
+                    fluxSink.next(t);
+                });
+                fluxSink.complete();
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                log.error("search failed", e);
+                fluxSink.error(new RuntimeException(e));
+            }
+        };
+    }
+
+    protected void clearScroll(String scrollId) {
+        ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
+        clearScrollRequest.addScrollId(scrollId);
+        getRestClient().clearScrollAsync(clearScrollRequest, RequestOptions.DEFAULT, new ActionListener<ClearScrollResponse>() {
+            @Override
+            public void onResponse(ClearScrollResponse clearScrollResponse) {
+                log.debug("clearScrollResponse.isSucceeded={}", clearScrollResponse.isSucceeded());
+            }
+
+            @Override
+            public void onFailure(Exception e) {
+                log.error("unable to clear scroll response", e);
+            }
+        });
     }
 
     public Mono<T> save(T data) {

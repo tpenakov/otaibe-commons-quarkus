@@ -12,6 +12,7 @@ public class AbstractMicroRs<T> {
     List<T> result;
     Page page;
     ErrorRs error;
+    Long totalResults;
 
     public void add(T entity) {
         if (getResult() == null) {
