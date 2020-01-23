@@ -4,15 +4,15 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.elasticsearch.search.sort.SortOrder;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Data
 @NoArgsConstructor
 public class EsMetadata {
 
     private EsQueryMetadata query = new EsQueryMetadata();
-    private Map<String, EsDaoMetadata> daoMap = new HashMap<>();
+    private Map<String, EsDaoMetadata> daoMap = new ConcurrentHashMap<>();
 
     @Data
     @NoArgsConstructor
