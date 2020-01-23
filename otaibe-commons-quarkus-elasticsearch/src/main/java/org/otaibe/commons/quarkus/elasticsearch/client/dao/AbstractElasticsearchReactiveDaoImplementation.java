@@ -33,6 +33,7 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.elasticsearch.client.domain.EsMetadata;
 import org.otaibe.commons.quarkus.elasticsearch.client.service.AbstractElasticsearchService;
+import org.otaibe.commons.quarkus.elasticsearch.client.utils.EsMetadataUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
@@ -63,7 +64,6 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     public static final String FORMAT = "format";
     public static final String LONG = "long";
     public static final String BOOLEAN = "boolean";
-    public static final String METADATA = "metadata";
     public static final TimeValue SCROLL_KEEP_ALIVE = TimeValue.timeValueMinutes(1);
 
     @Inject
@@ -71,6 +71,9 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
 
     @Inject
     JsonUtils jsonUtils;
+
+    @Inject
+    EsMetadataUtils esMetadataUtils;
 
     private RestHighLevelClient restClient;
 
@@ -231,7 +234,7 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         return Mono.subscriberContext()
                 .map(context -> {
                     SearchSourceBuilder builder = searchRequest.source();
-                    context.<EsMetadata>getOrEmpty(METADATA).ifPresent(esMetadata -> {
+                    getEsMetadataUtils().extract(context).ifPresent(esMetadata -> {
                         Optional.ofNullable(esMetadata.getQuery()).ifPresent(query -> {
                             Optional.ofNullable(query.getFrom())
                                     .ifPresent(integer -> builder.from(integer));
@@ -278,9 +281,9 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
             @Override
             public void onResponse(SearchResponse searchResponse) {
                 SearchHits hits = searchResponse.getHits();
-                context.<EsMetadata>getOrEmpty(METADATA).ifPresent(metadata1 -> {
+                getEsMetadataUtils().extract(context).ifPresent(metadata1 -> {
                     EsMetadata.EsDaoMetadata metadata = new EsMetadata.EsDaoMetadata();
-                    metadata1.getDaoMap().put(getTableName(), metadata);
+                    getEsMetadataUtils().ensureDaoMap(metadata1).put(getTableName(), metadata);
 
                     String scrollId = searchResponse.getScrollId();
                     boolean haveScrollId = StringUtils.isNotBlank(scrollId);
@@ -327,10 +330,10 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         });
     }
 
-    public Mono<T> save(T data) {
+    public Mono<T> save(T t) {
 
-        return Mono.just(data)
-                .flatMap(t -> {
+        return Mono.subscriberContext()
+                .flatMap(context -> {
                     if (StringUtils.isBlank(getId(t))) {
                         setId(t, UUID.randomUUID().toString());
                     }
@@ -339,12 +342,18 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
                     request.id(getId(t));
                     request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
 
-                    Long versionNum = Optional.ofNullable(getVersion(t))
-                            .map(aLong -> aLong + 1)
-                            .orElse(0l);
-                    request.version(versionNum);
-                    request.versionType(VersionType.EXTERNAL);
-                    setVersion(t, versionNum);
+                    Optional<Boolean> isCreateOnly = getEsMetadataUtils().extract(context)
+                            .map(EsMetadata::getQuery)
+                            .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
+                    isCreateOnly.ifPresent(aBoolean -> request.create(aBoolean));
+                    if (!isCreateOnly.orElse(false)) {
+                        Long versionNum = Optional.ofNullable(getVersion(t))
+                                .map(aLong -> aLong + 1)
+                                .orElse(0l);
+                        request.version(versionNum);
+                        request.versionType(VersionType.EXTERNAL);
+                        setVersion(t, versionNum);
+                    }
 
                     return Mono.just(getJsonUtils().toStringLazy(t).toString())
                             .flatMapMany(s -> Flux.<T>create(fluxSink -> {
@@ -390,31 +399,42 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         request.retryOnConflict(5);
         request.fetchSource(true);
 
-        return Flux.<T>create(fluxSink -> {
-            getRestClient().updateAsync(request, RequestOptions.DEFAULT, new ActionListener<UpdateResponse>() {
-                @Override
-                public void onResponse(UpdateResponse response) {
-                    GetResult result = response.getGetResult();
-                    if (result.isExists() && !result.isSourceEmpty()) {
-                        String sourceAsString = result.sourceAsString();
-                        getJsonUtils().readValue(sourceAsString, getEntityClass())
-                                .ifPresent(t -> {
-                                    setVersion(t, response.getVersion());
-                                    fluxSink.next(t);
-                                });
-                    }
-                    fluxSink.complete();
-                }
+        return Mono.subscriberContext()
+                .flatMap(context ->
+                    Flux.<T>create(fluxSink -> {
+                        getRestClient().updateAsync(request, RequestOptions.DEFAULT, new ActionListener<UpdateResponse>() {
+                            @Override
+                            public void onResponse(UpdateResponse response) {
+                                GetResult result = response.getGetResult();
+                                if (result.isExists() && !result.isSourceEmpty()) {
+                                    String sourceAsString = result.sourceAsString();
+                                    getJsonUtils().readValue(sourceAsString, getEntityClass())
+                                            .ifPresent(t -> {
+                                                setVersion(t, response.getVersion());
+                                                fluxSink.next(t);
+                                            });
+                                }
+                                fluxSink.complete();
+                            }
 
-                @Override
-                public void onFailure(Exception e) {
-                    log.error("unable to update", e);
-                    fluxSink.error(new RuntimeException(e));
-                }
-            });
-        })
-                .next()
-                .flatMap(t -> save(t)) //ugly hack in order to update version number in db
+                            @Override
+                            public void onFailure(Exception e) {
+                                log.error("unable to update", e);
+                                fluxSink.error(new RuntimeException(e));
+                            }
+                        });
+                    })
+                            .next()
+                            .flatMap(t -> {
+                                Optional<Boolean> isCreateOnly = getEsMetadataUtils().extract(context)
+                                        .map(EsMetadata::getQuery)
+                                        .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
+                                if (!isCreateOnly.orElse(false)) {
+                                    return save(t);//ugly hack in order to update version number in db
+                                }
+                                return Mono.just(t);
+                            })
+                )
                 ;
     }
 
@@ -451,6 +471,14 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
     protected Mono<Boolean> createIndex() {
         CreateIndexRequest request = new CreateIndexRequest(getTableName());
 
+        return createIndex(request);
+    }
+
+    protected Mono<Boolean> createIndex(Map<String, Object> propsMapping) {
+        CreateIndexRequest request = new CreateIndexRequest(getTableName());
+        Map<String, Object> mapping = new HashMap();
+        mapping.put(PROPERTIES, propsMapping);
+        request.mapping(mapping);
         return createIndex(request);
     }
 

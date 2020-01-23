@@ -5,14 +5,13 @@ import lombok.NoArgsConstructor;
 import org.elasticsearch.search.sort.SortOrder;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Data
 @NoArgsConstructor
 public class EsMetadata {
 
-    private EsQueryMetadata query = new EsQueryMetadata();
-    private Map<String, EsDaoMetadata> daoMap = new ConcurrentHashMap<>();
+    private EsQueryMetadata query;
+    private Map<String, EsDaoMetadata> daoMap;
 
     @Data
     @NoArgsConstructor
@@ -21,6 +20,7 @@ public class EsMetadata {
         private Integer size;
         private Map<String, SortOrder> sort;
         private Boolean askForScrollId;
+        private Boolean isOpTypeCreate;
     }
     @Data
     @NoArgsConstructor
