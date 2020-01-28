@@ -51,8 +51,8 @@ import java.util.stream.Collectors;
 @Slf4j
 public class EurekaClient {
 
-    @ConfigProperty(name = "quarkus.servlet.context-path", defaultValue = StringUtils.EMPTY)
-    String contextPath;
+    @ConfigProperty(name = "quarkus.servlet.context-path")
+    Optional<String> contextPath;
     @ConfigProperty(name = "quarkus.application.name")
     String appName;
     @ConfigProperty(name = "eureka.instance.hostname")
@@ -226,7 +226,7 @@ public class EurekaClient {
                 .app(getAppName())
                 .port(getPort())
                 .eurekaHostName(getHostNameForEureka())
-                .contextPath(getContextPath())
+                .contextPath(getContextPath().orElse(StringUtils.EMPTY))
                 .ipAddress(hostAddress)
                 .build();
     }
