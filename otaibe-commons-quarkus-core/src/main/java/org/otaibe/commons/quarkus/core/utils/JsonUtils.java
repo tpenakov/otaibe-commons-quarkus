@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +47,7 @@ public class JsonUtils {
         try {
             T value = objectMapper.readValue(objectMapper.writeValueAsBytes(input), outputClass);
             return value;
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("unable to transform to outputClass", e);
             throw new RuntimeException(e);
         }
@@ -85,7 +84,7 @@ public class JsonUtils {
                                 return val;
                             }
                     ));
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("unable to transform to Map", e);
             throw new RuntimeException(e);
         }
@@ -101,7 +100,7 @@ public class JsonUtils {
         }
         try {
             return objectMapper.readValue(objectMapper.writeValueAsBytes(input), resultType);
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("unable to serialize", e);
             throw new RuntimeException(e);
         }
@@ -132,7 +131,7 @@ public class JsonUtils {
                 .map(objectMapper -> {
                     try {
                         return objectMapper.readValue(value, clazz);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         logger.error("unable to deserialize", e);
                     }
                     return null;
@@ -144,7 +143,7 @@ public class JsonUtils {
                 .map(objectMapper -> {
                     try {
                         return objectMapper.readValue(value, clazz);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         logger.error("unable to deserialize", e);
                     }
                     return null;
@@ -156,7 +155,7 @@ public class JsonUtils {
                 .map(objectMapper -> {
                     try {
                         return objectMapper.readValue(value, clazz);
-                    } catch (IOException e) {
+                    } catch (Exception e) {
                         logger.error("unable to deserialize", e);
                     }
                     return null;
