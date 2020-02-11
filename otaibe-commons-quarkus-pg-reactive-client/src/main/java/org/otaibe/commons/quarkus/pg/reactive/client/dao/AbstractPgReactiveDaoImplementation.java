@@ -20,6 +20,7 @@ import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.text.MessageFormat;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -46,6 +47,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     private String selectFromSql;
     private String deleteByIdSql;
     private String findByIdSql;
+    private AtomicBoolean isInited = new AtomicBoolean(false);
 
     protected abstract String getIdFieldName();
 
@@ -72,6 +74,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
         fillSelectFromSql();
         fillDeleteByIdTemplate();
         fillFindByIdTemplate();
+        getIsInited().set(true);
         log.info("init completed");
     }
 
