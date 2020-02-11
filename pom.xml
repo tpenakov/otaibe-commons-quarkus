@@ -20,6 +20,7 @@
         <module>otaibe-commons-quarkus-pg-reactive-client</module>
         <module>otaibe-commons-quarkus-cache</module>
         <module>otaibe-commons-quarkus-elasticsearch</module>
+        <module>otaibe-commons-quarkus-reflection</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
@@ -178,6 +179,17 @@
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
                 <version>1.18.8</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.reflections</groupId>
+                <artifactId>reflections</artifactId>
+                <version>0.9.12</version>
+            </dependency>
+            <dependency>
+                <groupId>com.oracle.substratevm</groupId>
+                <artifactId>svm</artifactId>
+                <version>19.2.1</version>
             </dependency>
 
         </dependencies>
