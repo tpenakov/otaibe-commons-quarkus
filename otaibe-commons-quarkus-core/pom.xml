@@ -3,7 +3,7 @@
     <parent>
         <artifactId>otaibe-commons-quarkus</artifactId>
         <groupId>org.otaibe.commons.quarkus</groupId>
-        <version>00.00.03-SNAPSHOT</version>
+        <version>00.00.04-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -34,8 +34,8 @@
             <artifactId>javax.annotation-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
+            <groupId>org.jboss.spec.javax.xml.bind</groupId>
+            <artifactId>jboss-jaxb-api_2.3_spec</artifactId>
         </dependency>
 
         <dependency>

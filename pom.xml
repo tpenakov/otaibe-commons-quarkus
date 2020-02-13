@@ -6,7 +6,7 @@
     <groupId>org.otaibe.commons.quarkus</groupId>
     <artifactId>otaibe-commons-quarkus</artifactId>
     <packaging>pom</packaging>
-    <version>00.00.03-SNAPSHOT</version>
+    <version>00.00.04-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
@@ -30,7 +30,7 @@
         <aws.sdk.version>2.10.56</aws.sdk.version>
         <jackson.version>2.9.10</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
-        <vertx.version>3.8.3</vertx.version>
+        <vertx.version>3.8.4</vertx.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -90,7 +90,7 @@
             <dependency>
                 <groupId>io.vertx</groupId>
                 <artifactId>vertx-web</artifactId>
-                <version>${vertx.version}-01</version>
+                <version>${vertx.version}</version>
             </dependency>
 
             <dependency>
@@ -109,9 +109,9 @@
                 <version>1.3.2</version>
             </dependency>
             <dependency>
-                <groupId>javax.xml.bind</groupId>
-                <artifactId>jaxb-api</artifactId>
-                <version>2.3.1</version>
+                <groupId>org.jboss.spec.javax.xml.bind</groupId>
+                <artifactId>jboss-jaxb-api_2.3_spec</artifactId>
+                <version>2.0.0.Final</version>
             </dependency>
 
             <dependency>
