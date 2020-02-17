@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.otaibe.commons.quarkus</groupId>
+        <artifactId>otaibe-commons-quarkus-aws-extension-parent</artifactId>
+        <version>00.00.04-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>otaibe-commons-quarkus-aws-extension</artifactId>
+    <name>AWS module - Quarkus AWS Extension - Runtime</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.otaibe.commons.quarkus</groupId>
+            <artifactId>otaibe-commons-quarkus-aws</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-core</artifactId>
+            <version>${quarkus.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-arc</artifactId>
+            <version>${quarkus.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
+                <version>${quarkus.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>extension-descriptor</goal>
+                        </goals>
+                        <phase>compile</phase>
+                        <configuration>
+                            <deployment>${project.groupId}:${project.artifactId}-deployment:${project.version}
+                            </deployment>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-extension-processor</artifactId>
+                            <version>${quarkus.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
