@@ -13,6 +13,10 @@ public class CastUtils {
         return t.isInstance(o) ? t.cast(o) : null;
     }
 
+    public <T> Optional<T> asOptional(Class<T> t, Object o) {
+        return Optional.ofNullable(as(t, o));
+    }
+
     public <T> T as(Optional<T> t) {
         return t.isPresent() ? t.get() : null;
     }
