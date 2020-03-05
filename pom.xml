@@ -29,7 +29,7 @@
     <properties>
         <quarkus.version>1.0.0.CR1</quarkus.version>
         <aws.sdk.version>2.10.56</aws.sdk.version>
-        <jackson.version>2.9.10</jackson.version>
+        <jackson.version>2.10.3</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
         <vertx.version>3.8.4</vertx.version>
 
@@ -135,7 +135,7 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
-                <version>${jackson.version}.1</version>
+                <version>${jackson.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.fasterxml.jackson.dataformat</groupId>
