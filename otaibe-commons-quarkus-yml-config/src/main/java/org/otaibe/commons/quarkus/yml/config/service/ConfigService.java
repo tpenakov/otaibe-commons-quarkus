@@ -19,6 +19,7 @@ import reactor.util.function.Tuples;
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,19 @@ public abstract class ConfigService {
                 })
                 .subscribe();
 
+    }
+
+    public Mono<Boolean> isInitialized() {
+        return Flux.interval(Duration.ofMillis(1))
+                .retry()
+                .filter(aLong -> getIsInitialized().get())
+                .next()
+                .map(aLong -> true)
+                ;
+    }
+
+    public Boolean isInitializedBlocking() {
+        return isInitialized().block();
     }
 
     protected abstract void readAllSettings(Map<String, Object> allSettings1);
