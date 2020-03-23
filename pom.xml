@@ -22,6 +22,7 @@
         <module>otaibe-commons-quarkus-elasticsearch</module>
         <module>otaibe-commons-quarkus-reflection</module>
         <module>aws-extension</module>
+        <module>otaibe-commons-quarkus-nginx-eureka</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
