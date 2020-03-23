@@ -1,7 +1,8 @@
 package org.otaibe.commons.quarkus.pg.reactive.client.dao;
 
-import io.vertx.reactivex.sqlclient.Row;
-import io.vertx.reactivex.sqlclient.Tuple;
+import io.vertx.mutiny.pgclient.PgPool;
+import io.vertx.mutiny.sqlclient.Row;
+import io.vertx.mutiny.sqlclient.Tuple;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,6 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.pg.reactive.client.config.JsonConfig;
-import reactor.adapter.rxjava.RxJava2Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
@@ -37,7 +37,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     public static final String FIND_BY_ID = "{0} WHERE {1}=$1";
 
     @Inject
-    io.vertx.reactivex.pgclient.PgPool client;
+    PgPool client;
     @Inject
     JsonConfig jsonConfig;
     @Inject
@@ -80,14 +80,22 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
     public Mono<Boolean> deleteById(T data) {
         //String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
-        return RxJava2Adapter.singleToMono(getClient().rxPreparedQuery(getDeleteByIdSql(), getIdTuple(data)))
+        return Mono.from(getClient()
+                .preparedQuery(getDeleteByIdSql(), getIdTuple(data))
+                .convert()
+                .toPublisher()
+        )
                 .doOnNext(rows -> log.trace("delete data: {}", rows))
                 .map(rows -> rows.rowCount() == 1);
 
     }
 
     public Mono<T> findById(T pkData) {
-        return RxJava2Adapter.singleToMono(getClient().rxPreparedQuery(getFindByIdSql(), getIdTuple(pkData)))
+        return Mono.from(getClient()
+                .preparedQuery(getFindByIdSql(), getIdTuple(pkData))
+                .convert()
+                .toPublisher()
+        )
                 .flatMapMany(rows -> Flux.fromIterable(rows))
                 .next()
                 .map(row -> fromRow(row))
@@ -98,16 +106,20 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
         Tuple2<String, Tuple> objects1 = prepareForInsert(data);
 
-        return RxJava2Adapter
-                .singleToMono(getClient().rxBegin())
-                .flatMap(pgTransaction -> RxJava2Adapter
-                        .singleToMono(pgTransaction.rxPreparedQuery(getDeleteByIdSql(), getIdTuple(data)))
-                        .zipWhen(rows -> RxJava2Adapter
-                                .singleToMono(pgTransaction.rxPreparedQuery(objects1.getT1(), objects1.getT2())))
-                        .zipWhen(objects -> RxJava2Adapter
-                                .completableToMono(pgTransaction.rxCommit())
-                                .then(Mono.just(true))
+        return Mono.from(getClient().begin().convert().toPublisher())
+                .flatMap(pgTransaction -> Mono.from(pgTransaction
+                                .preparedQuery(getDeleteByIdSql(), getIdTuple(data))
+                                .convert()
+                                .toPublisher()
                         )
+                                .zipWhen(rows -> Mono.from(pgTransaction
+                                        .preparedQuery(objects1.getT1(), objects1.getT2())
+                                        .convert()
+                                        .toPublisher()
+                                ))
+                                .zipWhen(objects -> Mono.from(pgTransaction.commit().convert().toPublisher())
+                                        .then(Mono.just(true))
+                                )
                 )
                 .doOnNext(rows -> log.trace("save data: {}", rows))
                 .map(rows -> data);
@@ -134,8 +146,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
                     list.addAll(objects2.getT2());
                     return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create delete data batch"))
-                ;
+                .orElseThrow(() -> new RuntimeException("unable to create delete data batch"));
 
         Tuple2<String, List<Tuple>> insertData = batchData.stream()
                 .map(objects -> Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
@@ -144,19 +155,22 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
                     list.addAll(objects2.getT2());
                     return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create insert data batch"))
-                ;
+                .orElseThrow(() -> new RuntimeException("unable to create insert data batch"));
 
-        return RxJava2Adapter
-                .singleToMono(getClient().rxBegin())
-                .flatMap(pgTransaction -> RxJava2Adapter
-                        .singleToMono(pgTransaction.rxPreparedBatch(deleteData.getT1(), deleteData.getT2()))
-                        .zipWhen(rows -> RxJava2Adapter
-                                .singleToMono(pgTransaction.rxPreparedBatch(insertData.getT1(), insertData.getT2())))
-                        .zipWhen(objects -> RxJava2Adapter
-                                .completableToMono(pgTransaction.rxCommit())
-                                .then(Mono.just(true))
+        return Mono.from(getClient().begin().convert().toPublisher())
+                .flatMap(pgTransaction -> Mono.from(pgTransaction
+                                .preparedBatch(deleteData.getT1(), deleteData.getT2())
+                                .convert()
+                                .toPublisher()
                         )
+                                .zipWhen(rows -> Mono.from(pgTransaction
+                                        .preparedBatch(insertData.getT1(), insertData.getT2())
+                                        .convert()
+                                        .toPublisher()
+                                ))
+                                .zipWhen(objects -> Mono.from(pgTransaction.commit().convert().toPublisher())
+                                        .then(Mono.just(true))
+                                )
                 )
                 .doOnNext(rows -> log.trace("save data: {}", rows))
                 .map(rows -> rows.getT2());

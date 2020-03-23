@@ -3,15 +3,14 @@ package org.otaibe.commons.quarkus.yml.config.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import io.vertx.reactivex.core.Vertx;
-import io.vertx.reactivex.core.buffer.Buffer;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.core.buffer.Buffer;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.core.utils.MapWrapper;
-import reactor.adapter.rxjava.RxJava2Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuples;
@@ -126,8 +125,9 @@ public abstract class ConfigService {
     }
 
     public Mono<Map<String, Object>> readYmlMap(String path) {
-        return RxJava2Adapter.singleToMono(
-                getVertx().fileSystem().rxReadFile(path)
+        return Mono.from(
+                getVertx().fileSystem().readFile(path)
+                .convert().toPublisher()
         )
                 .map(Buffer::getBytes)
                 //.doOnNext(bytes -> log.info("fileName: {}", path))

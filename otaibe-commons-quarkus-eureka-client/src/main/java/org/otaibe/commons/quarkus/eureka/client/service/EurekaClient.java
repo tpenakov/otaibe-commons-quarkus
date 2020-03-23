@@ -3,9 +3,9 @@ package org.otaibe.commons.quarkus.eureka.client.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.core.impl.VertxImpl;
 import io.vertx.ext.web.client.WebClientOptions;
-import io.vertx.reactivex.core.Vertx;
-import io.vertx.reactivex.core.buffer.Buffer;
-import io.vertx.reactivex.ext.web.client.WebClient;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.core.buffer.Buffer;
+import io.vertx.mutiny.ext.web.client.WebClient;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -14,7 +14,6 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.core.utils.MapWrapper;
 import org.otaibe.commons.quarkus.eureka.client.domain.InstanceInfo;
-import reactor.adapter.rxjava.RxJava2Adapter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -111,7 +110,7 @@ public class EurekaClient {
                             .map(Map.Entry::getKey)
                             .collect(Collectors.toList())
                             .forEach(s -> getServersMap().remove(s))
-                            ;
+                    ;
                     return registerApp();
                 })
                 .subscribe()
@@ -178,11 +177,13 @@ public class EurekaClient {
          curl -v -H 'Content-Type: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{appName} \
          -X POST -d @/home/triphon/tmp.json
          */
-        return RxJava2Adapter.singleToMono(getClient()
+        return Mono.from(getClient()
                         .post(getPath(appName))
 //                .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
                         .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML)
-                        .rxSendBuffer(Buffer.buffer(rqString))
+                        .sendBuffer(Buffer.buffer(rqString))
+                        .convert()
+                        .toPublisher()
         )
                 .doOnSubscribe(subscription -> log.trace("instance info: {}", rqString))
                 .doOnNext(response -> log.debug("status code: {}, body: {}", response.statusCode(), response.bodyAsString()))
@@ -197,10 +198,12 @@ public class EurekaClient {
     }
 
     private Mono<Map<String, Object>> getApps(String path) {
-        return RxJava2Adapter.singleToMono(getClient()
+        return Mono.from(getClient()
                 .get(path)
                 .putHeader(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON)
-                .rxSend()
+                .send()
+                .convert()
+                .toPublisher()
         )
                 .map(bufferHttpResponse -> bufferHttpResponse.bodyAsString())
                 .doOnNext(s -> log.debug("all apps: {}", s))

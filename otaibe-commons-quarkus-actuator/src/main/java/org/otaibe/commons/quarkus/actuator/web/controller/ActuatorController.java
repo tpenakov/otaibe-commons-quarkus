@@ -1,8 +1,8 @@
 package org.otaibe.commons.quarkus.actuator.web.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.vertx.reactivex.core.Vertx;
-import io.vertx.reactivex.core.buffer.Buffer;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.core.buffer.Buffer;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +11,7 @@ import org.otaibe.commons.quarkus.actuator.web.domain.GitInfo;
 import org.otaibe.commons.quarkus.actuator.web.domain.Info;
 import org.otaibe.commons.quarkus.actuator.web.domain.Metrics;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
+import reactor.core.publisher.Mono;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -56,8 +57,12 @@ public class ActuatorController {
                 })
                 .orElseGet(() -> {
                     info = new Info();
-                    getVertx().fileSystem().rxReadFile(GIT_PROPERTIES)
+                    Mono.from(getVertx().fileSystem()
+                            .readFile(GIT_PROPERTIES)
                             .map(Buffer::toString)
+                            .convert()
+                            .toPublisher()
+                    )
                             .doOnSuccess(s -> log.info("git props: {}", s))
                             .map(s -> getJsonUtils().readValue(s, Map.class, getObjectMapper()))
                             .map(map -> map.orElse(new HashMap()))
