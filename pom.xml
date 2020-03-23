@@ -6,7 +6,7 @@
     <groupId>org.otaibe.commons.quarkus</groupId>
     <artifactId>otaibe-commons-quarkus</artifactId>
     <packaging>pom</packaging>
-    <version>00.00.04-SNAPSHOT</version>
+    <version>00.00.05-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
