@@ -30,6 +30,7 @@ import javax.ws.rs.core.UriBuilder;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -193,7 +194,7 @@ public class EurekaClient {
                 .switchIfEmpty(Mono.error(new RuntimeException("not registered")))
                 //.doOnError(throwable -> log.error("error", throwable))
                 .retryBackoff(Long.MAX_VALUE, Duration.ofMillis(100), Duration.ofSeconds(15), .5)
-                .doOnError(throwable -> log.error("unable to get all apps", throwable))
+                .doOnError(throwable -> log.error("unable to registerApp", throwable))
                 ;
     }
 
@@ -210,7 +211,7 @@ public class EurekaClient {
                 .map(s -> (Map<String, Object>) getJsonUtils().readValue(s, Map.class, getObjectMapper()).get())
                 //.doOnError(throwable -> log.error("error", throwable))
                 .retryBackoff(10, Duration.ofMillis(100), Duration.ofSeconds(1), .5)
-                .doOnError(throwable -> log.error("unable to get all apps", throwable))
+                .doOnError(throwable -> log.error(MessageFormat.format("unable to get apps for {0}", path) , throwable))
                 ;
     }
 
