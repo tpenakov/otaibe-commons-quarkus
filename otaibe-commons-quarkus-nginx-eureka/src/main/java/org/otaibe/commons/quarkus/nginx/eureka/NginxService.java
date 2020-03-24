@@ -118,6 +118,10 @@ public abstract class NginxService {
                     }
                     return StringUtils.EMPTY;
                 })
+                .onErrorResume(throwable -> {
+                    found.set(true);
+                    return Mono.just(StringUtils.EMPTY);
+                })
                 .repeat(() -> !found.get())
                 .filter(s -> StringUtils.isNotBlank(s))
                 .map(s -> {
