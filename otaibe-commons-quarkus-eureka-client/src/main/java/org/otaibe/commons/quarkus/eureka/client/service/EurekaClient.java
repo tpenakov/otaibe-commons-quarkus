@@ -178,21 +178,23 @@ public class EurekaClient {
          curl -v -H 'Content-Type: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{appName} \
          -X POST -d @/home/triphon/tmp.json
          */
-        return Mono.from(getClient()
-                        .post(getPath(appName))
-//                .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-                        .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML)
-                        .sendBuffer(Buffer.buffer(rqString))
-                        .convert()
-                        .toPublisher()
-        )
-                .doOnSubscribe(subscription -> log.trace("instance info: {}", rqString))
+        String path = getPath(appName);
+        return Mono.defer(() -> Mono.from(getClient()
+                .post(path)
+                .putHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_XML)
+                .sendBuffer(Buffer.buffer(rqString))
+                .ifNoItem().after(Duration.ofSeconds(15)).fail()
+                .convert()
+                .toPublisher()
+        ))
+                .doOnSubscribe(subscription -> log.trace("url: {}, instance info: \n{}", path, rqString))
                 .doOnNext(response -> log.debug("status code: {}, body: {}", response.statusCode(), response.bodyAsString()))
                 .map(bufferHttpResponse -> bufferHttpResponse.statusCode())
                 .map(integer -> Response.Status.Family.SUCCESSFUL.equals(Response.Status.fromStatusCode(integer).getFamily()))
                 .filter(Boolean::booleanValue)
                 .switchIfEmpty(Mono.error(new RuntimeException("not registered")))
                 //.doOnError(throwable -> log.error("error", throwable))
+                .doOnError(throwable -> log.trace("unable to registerApp", throwable))
                 .retryBackoff(Long.MAX_VALUE, Duration.ofMillis(100), Duration.ofSeconds(15), .5)
                 .doOnError(throwable -> log.error("unable to registerApp", throwable))
                 ;
@@ -211,7 +213,7 @@ public class EurekaClient {
                 .map(s -> (Map<String, Object>) getJsonUtils().readValue(s, Map.class, getObjectMapper()).get())
                 //.doOnError(throwable -> log.error("error", throwable))
                 .retryBackoff(10, Duration.ofMillis(100), Duration.ofSeconds(1), .5)
-                .doOnError(throwable -> log.error(MessageFormat.format("unable to get apps for {0}", path) , throwable))
+                .doOnError(throwable -> log.error(MessageFormat.format("unable to get apps for {0}", path), throwable))
                 ;
     }
 
