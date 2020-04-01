@@ -3,7 +3,7 @@
     <parent>
         <groupId>org.otaibe.commons.quarkus</groupId>
         <artifactId>otaibe-commons-quarkus</artifactId>
-        <version>00.00.05-SNAPSHOT</version>
+        <version>00.00.06-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
