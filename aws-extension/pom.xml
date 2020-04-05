@@ -11,10 +11,6 @@
     <artifactId>otaibe-commons-quarkus-aws-extension-parent</artifactId>
     <name>AWS module - Quarkus AWS Extension - Parent</name>
 
-    <properties>
-        <quarkus.version>1.2.0.Final</quarkus.version>
-    </properties>
-
     <packaging>pom</packaging>
     <modules>
         <module>deployment</module>
