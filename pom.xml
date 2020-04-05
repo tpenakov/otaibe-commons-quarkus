@@ -195,11 +195,6 @@
                 <artifactId>reflections</artifactId>
                 <version>0.9.12</version>
             </dependency>
-            <dependency>
-                <groupId>com.oracle.substratevm</groupId>
-                <artifactId>svm</artifactId>
-                <version>19.2.1</version>
-            </dependency>
 
         </dependencies>
     </dependencyManagement>
