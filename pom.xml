@@ -23,6 +23,7 @@
         <module>otaibe-commons-quarkus-reflection</module>
         <module>aws-extension</module>
         <module>otaibe-commons-quarkus-nginx-eureka</module>
+        <module>re-read-http-request-body</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
