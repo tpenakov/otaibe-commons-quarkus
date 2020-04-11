@@ -29,7 +29,7 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>1.3.1.Final</quarkus.version>
+        <quarkus.version>1.3.2.Final</quarkus.version>
         <aws.sdk.version>2.10.70</aws.sdk.version>
         <jackson.version>2.10.3</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
