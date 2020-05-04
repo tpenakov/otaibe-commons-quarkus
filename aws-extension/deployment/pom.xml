@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.otaibe.commons.quarkus</groupId>
         <artifactId>otaibe-commons-quarkus-aws-extension-parent</artifactId>
-        <version>00.00.06-SNAPSHOT</version>
+        <version>00.00.07-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

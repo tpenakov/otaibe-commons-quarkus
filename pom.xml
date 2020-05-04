@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.otaibe.commons.quarkus</groupId>
     <artifactId>otaibe-commons-quarkus</artifactId>
     <packaging>pom</packaging>
-    <version>00.00.06-SNAPSHOT</version>
+    <version>00.00.07-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
@@ -30,7 +29,7 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>1.3.2.Final</quarkus.version>
+        <quarkus.version>1.4.1.Final</quarkus.version>
         <aws.sdk.version>2.10.70</aws.sdk.version>
         <jackson.version>2.10.3</jackson.version>
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
