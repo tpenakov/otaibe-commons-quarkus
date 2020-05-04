@@ -2,6 +2,7 @@ package org.otaibe.commons.quarkus.pg.reactive.client.dao;
 
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Row;
+import io.vertx.mutiny.sqlclient.Transaction;
 import io.vertx.mutiny.sqlclient.Tuple;
 import lombok.Getter;
 import lombok.Setter;
@@ -124,6 +125,17 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
                 .doOnNext(rows -> log.trace("save data: {}", rows))
                 .map(rows -> data);
     }
+
+    protected Mono<T> save(Transaction transaction, T data) {
+        Tuple2<String, Tuple> objects = prepareForInsert(data);
+
+        return Mono.from(transaction.preparedQuery(objects.getT1(), objects.getT2())
+                .convert()
+                .toPublisher()
+        )
+                .map(rows -> data);
+    }
+
 
     public Mono<Boolean> batchSave(List<T> dataList) {
         if (CollectionUtils.isEmpty(dataList)) {
