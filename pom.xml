@@ -24,6 +24,7 @@
         <module>aws-extension</module>
         <module>otaibe-commons-quarkus-nginx-eureka</module>
         <module>re-read-http-request-body</module>
+        <module>keycloak-extension</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
