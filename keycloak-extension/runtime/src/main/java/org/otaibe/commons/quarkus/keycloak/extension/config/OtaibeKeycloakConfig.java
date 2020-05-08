@@ -59,6 +59,11 @@ public class OtaibeKeycloakConfig {
             @ConfigItem
             public String name;
             /**
+             * secret of the client
+             */
+            @ConfigItem
+            public String secret;
+            /**
              * map of roles used for the client
              */
             @ConfigItem
