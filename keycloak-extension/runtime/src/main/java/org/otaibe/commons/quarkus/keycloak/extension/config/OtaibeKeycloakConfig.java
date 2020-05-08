@@ -4,15 +4,11 @@ import io.quarkus.runtime.annotations.ConfigGroup;
 import io.quarkus.runtime.annotations.ConfigItem;
 import io.quarkus.runtime.annotations.ConfigPhase;
 import io.quarkus.runtime.annotations.ConfigRoot;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.Map;
 import java.util.Optional;
 
 @ConfigRoot(name = "otaibe.keycloak", phase = ConfigPhase.BUILD_AND_RUN_TIME_FIXED)
-@Getter
-@Setter
 public class OtaibeKeycloakConfig {
 
     /**
@@ -22,8 +18,6 @@ public class OtaibeKeycloakConfig {
     public Map<String, KeycloakRealmConfig> realm;
 
     @ConfigGroup
-    @Getter
-    @Setter
     public static class KeycloakRealmConfig {
 
         /**
@@ -53,8 +47,6 @@ public class OtaibeKeycloakConfig {
         public String defaultRoles[];
 
         @ConfigGroup
-        @Getter
-        @Setter
         public static class KeycloakClientConfig {
             /**
              * id of the client
