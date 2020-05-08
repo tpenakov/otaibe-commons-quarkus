@@ -10,6 +10,8 @@ import org.otaibe.commons.quarkus.keycloak.extension.config.OtaibeKeycloakConfig
 import org.otaibe.commons.quarkus.keycloak.extension.config.OtaibeKeycloakQuarkusProducer;
 import org.otaibe.commons.quarkus.keycloak.extension.config.OtaibeKeycloakRecorder;
 
+import java.util.Optional;
+
 class KeycloakExtensionProcessor {
 
     private static final String FEATURE = "keycloak-extension";
@@ -25,23 +27,18 @@ class KeycloakExtensionProcessor {
     }
 
     @BuildStep
-    OtaibeKeycloackConfigBuildItem otaibeKeycloackConfigBuildItem(OtaibeKeycloakConfig otaibeKeycloakConfig) throws Exception {
-        if (null == otaibeKeycloakConfig.realm) {
-            throw new RuntimeException("null == otaibeKeycloakConfig.realm");
-        }
-        return new OtaibeKeycloackConfigBuildItem(otaibeKeycloakConfig);
-    }
-
-    @BuildStep
     @Record(ExecutionTime.RUNTIME_INIT)
     void otaibeKeycloackConfigBuildItem(BeanContainerBuildItem beanContainer,
-                                        OtaibeKeycloackConfigBuildItem buildItem,
-                                        OtaibeKeycloakRecorder recorder) throws Exception {
-        OtaibeKeycloakConfig otaibeKeycloakConfig1 = buildItem.getOtaibeKeycloakConfig();
-        if (null == otaibeKeycloakConfig1.realm) {
-            throw new RuntimeException("null == otaibeKeycloakConfig1.realm");
-        }
-        recorder.initOtaQuarkusProducer(beanContainer.getValue(), otaibeKeycloakConfig1);
+                                        OtaibeKeycloakConfig otaibeKeycloakConfig,
+                                        OtaibeKeycloakRecorder recorder) {
+        Optional.ofNullable(otaibeKeycloakConfig)
+                .filter(config -> null != config.realm)
+                .ifPresentOrElse(
+                        config -> recorder.initOtaQuarkusProducer(beanContainer.getValue(), config),
+                        () -> {
+                            throw new RuntimeException("otaibeKeycloakConfig.realm is null");
+                        }
+                );
     }
 
 }

@@ -6,7 +6,7 @@ import io.quarkus.runtime.annotations.Recorder;
 @Recorder
 public class OtaibeKeycloakRecorder {
 
-    public void initOtaQuarkusProducer(BeanContainer container, OtaibeKeycloakConfig configuration) throws Exception {
+    public void initOtaQuarkusProducer(BeanContainer container, OtaibeKeycloakConfig configuration) {
         OtaibeKeycloakQuarkusProducer producer = container.instance(OtaibeKeycloakQuarkusProducer.class);
         producer.initialize(configuration);
     }
