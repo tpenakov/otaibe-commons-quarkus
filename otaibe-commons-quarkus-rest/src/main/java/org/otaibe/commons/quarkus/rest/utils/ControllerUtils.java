@@ -1,11 +1,13 @@
 package org.otaibe.commons.quarkus.rest.utils;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.ext.web.RoutingContext;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import reactor.core.publisher.Mono;
+import reactor.util.function.Tuple3;
 import reactor.util.function.Tuples;
 
 import javax.enterprise.context.ApplicationScoped;
@@ -22,6 +24,7 @@ import java.util.function.Function;
 public class ControllerUtils {
 
     public static final String CLIENT_ERROR_KEY = "client-error-key";
+    public static final String OBJECT_MAPPER_KEY = "object-mapper-key";
 
     @Inject
     JsonUtils jsonUtils;
@@ -33,15 +36,11 @@ public class ControllerUtils {
         try {
             return result
                     .defaultIfEmpty(defaultIfEmpty)
-                    .flatMap(t -> Mono.subscriberContext()
-                            .map(context -> context.getOrEmpty(CLIENT_ERROR_KEY))
-                            .map(o -> Tuples.of(t, o))
-                    )
+                    .flatMap(t -> fillContext(t))
                     .doOnNext(objects -> Optional.ofNullable(objects.getT1())
                             .filter(t -> isValid.apply(t))
                             .map(t -> {
-                                String body = String.class.isAssignableFrom(t.getClass()) ?
-                                        (String) t : getJsonUtils().toStringLazy(t).toString();
+                                String body = getStringBody(objects, t);
                                 rc.response().end(body);
                                 return true;
                             })
@@ -67,18 +66,15 @@ public class ControllerUtils {
         try {
             return result
                     .defaultIfEmpty(defaultIfEmpty)
-                    .flatMap(t -> Mono.subscriberContext()
-                            .map(context -> context.getOrEmpty(CLIENT_ERROR_KEY))
-                            .map(o -> Tuples.of(t, o))
-                    )
+                    .flatMap(t -> fillContext(t))
                     .doOnNext(objects -> Optional.ofNullable(objects.getT1())
                             .filter(t -> isValid.apply(t))
-                            .map(t -> webResult.complete(Response.ok(t).build()))
+                            .map(t -> webResult.complete(Response.ok(getStringBody(objects, t)).build()))
                             .orElseGet(() -> {
-                                Response.Status status = objects.getT2().map(o -> (Response.Status) o).orElse(Response.Status.BAD_REQUEST);
-                                return webResult.complete(
-                                        buildErrorResponse(status,
-                                                status.getReasonPhrase()));
+                                        Response.Status status = objects.getT2().map(o -> (Response.Status) o).orElse(Response.Status.BAD_REQUEST);
+                                        return webResult.complete(
+                                                buildErrorResponse(status,
+                                                        status.getReasonPhrase()));
                                     }
                             ))
                     .map(objects -> objects.getT1())
@@ -110,4 +106,21 @@ public class ControllerUtils {
                 .build();
     }
 
+    protected <T> Mono<Tuple3<T, Optional<Object>, ObjectMapper>> fillContext(T t) {
+        return Mono.subscriberContext()
+                .map(context -> context.getOrEmpty(CLIENT_ERROR_KEY))
+                .map(o -> Tuples.of(t, o))
+                .flatMap(objects -> Mono.subscriberContext()
+                        .map(context -> context.<ObjectMapper>getOrEmpty(OBJECT_MAPPER_KEY))
+                        .map(objectMapper -> Tuples.of(
+                                objects.getT1(),
+                                objects.getT2(),
+                                objectMapper.orElse(getJsonUtils().getObjectMapper())
+                        )));
+    }
+
+    protected <T> String getStringBody(Tuple3<T, Optional<Object>, ObjectMapper> objects, T t) {
+        return String.class.isAssignableFrom(t.getClass()) ?
+                (String) t : getJsonUtils().toStringLazy(t, objects.getT3()).toString();
+    }
 }
