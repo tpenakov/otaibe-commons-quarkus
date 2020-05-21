@@ -50,6 +50,7 @@ public class ControllerUtils {
                                 return false;
                             }))
                     .map(objects -> objects.getT1())
+                    .doOnError(throwable -> log.error("processResult error", throwable))
                     .doOnError(throwable -> setError(rc, Response.Status.INTERNAL_SERVER_ERROR, throwable.getMessage()))
                     .doOnTerminate(() -> log.debug("processResult end."));
         } catch (Exception e) {
@@ -78,6 +79,7 @@ public class ControllerUtils {
                                     }
                             ))
                     .map(objects -> objects.getT1())
+                    .doOnError(throwable -> log.error("processResult error", throwable))
                     .doOnError(throwable -> webResult.complete(
                             buildErrorResponse(
                                     Response.Status.INTERNAL_SERVER_ERROR,
