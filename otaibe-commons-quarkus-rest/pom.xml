@@ -15,6 +15,11 @@
             <artifactId>otaibe-commons-quarkus-core</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.otaibe.commons.quarkus</groupId>
+            <artifactId>otaibe-commons-quarkus-web</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>io.projectreactor</groupId>
