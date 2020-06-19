@@ -23,6 +23,7 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Optional;
@@ -42,6 +43,13 @@ public class StorageProcessor {
     public static final int FIRST_DELAY_MILLIS = 10;
     public static final int MAX_RETRY_DELAY_SECONDS = 1;
 
+    public static final String AWS_ACCESS_KEY_ID = "aws.accessKeyId";
+    public static final String AWS_SECRET_ACCESS_KEY = "aws.secretAccessKey";
+
+    @ConfigProperty(name = AWS_ACCESS_KEY_ID)
+    Optional<String> awsAccessKeyId;
+    @ConfigProperty(name = AWS_SECRET_ACCESS_KEY)
+    Optional<String> awsSecretAccessKey;
     @ConfigProperty(name = "cloud.aws.region.static")
     Optional<String> awsRegion;
     @ConfigProperty(name = "cloud.aws.num.threads")
@@ -50,6 +58,8 @@ public class StorageProcessor {
     String awsBucket1;
     @ConfigProperty(name = "cloud.aws.storage.processor.ensure.write", defaultValue = "false")
     Boolean ensureWrite;
+    @ConfigProperty(name = "cloud.aws.endpoint")
+    Optional<String> s3AwsEndpoint;
 
     @Inject
     JsonUtils jsonUtils;
@@ -60,10 +70,19 @@ public class StorageProcessor {
     S3AsyncClient s3AsyncClient;
 
     @PostConstruct
-    public void init() {
+    public void init() throws Exception {
+        getAwsAccessKeyId().ifPresent(s -> {
+            System.setProperty(AWS_ACCESS_KEY_ID, s);
+            System.setProperty(AWS_SECRET_ACCESS_KEY, getAwsSecretAccessKey().get());
+        });
+
         S3AsyncClientBuilder s3AsyncClientBuilder = createS3AsyncClientBuilder();
         awsRegion.ifPresent(s -> s3AsyncClientBuilder.region(Region.of(s)));
+        if (getS3AwsEndpoint().isPresent()) {
+            s3AsyncClientBuilder.endpointOverride(new URI(getS3AwsEndpoint().get()));
+        }
         s3AsyncClient = s3AsyncClientBuilder.build();
+
         String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
         awsBucket = StringUtils.substring(strip, 0, StringUtils.length(strip) - 1);
         log.info("initialized ensureWrite={}", getEnsureWrite());
