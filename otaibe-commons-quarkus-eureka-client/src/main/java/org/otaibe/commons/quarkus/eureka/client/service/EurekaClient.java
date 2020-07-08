@@ -10,15 +10,18 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.microprofile.config.ConfigProvider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.core.utils.MapWrapper;
+import org.otaibe.commons.quarkus.eureka.client.domain.EurekaSettings;
 import org.otaibe.commons.quarkus.eureka.client.domain.InstanceInfo;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
+import reactor.util.retry.Retry;
 
 import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
@@ -55,14 +58,11 @@ public class EurekaClient {
     Optional<String> contextPath;
     @ConfigProperty(name = "quarkus.application.name")
     String appName;
-    @ConfigProperty(name = "eureka.instance.hostname")
-    String hostNameForEureka;
-    @ConfigProperty(name = "eureka.client.serviceUrl.defaultZone")
-    String eurekaDefaultZone;
-    @ConfigProperty(name = "eureka.server.path")
-    String eurekaServerPath;
     @ConfigProperty(name = "quarkus.http.port")
     Integer port;
+
+    @Inject
+    EurekaSettings eurekaSettings;
 
     @Inject
     Vertx vertx;
@@ -84,7 +84,8 @@ public class EurekaClient {
     @PostConstruct
     public void init() {
         log.info("init started");
-        UriBuilder path = UriBuilder.fromUri(getEurekaDefaultZone()).path(getEurekaServerPath());
+        UriBuilder path = UriBuilder.fromUri(getEurekaSettings().getEurekaDefaultZone())
+                .path(getEurekaSettings().getEurekaServerPath());
         URI build = path.build();
         this.client = WebClient.create(getVertx(),
                 new WebClientOptions()
@@ -100,22 +101,24 @@ public class EurekaClient {
         initInstanceInfo();
         Duration period = Duration.ofSeconds(30);
 
-        registerApp()
-                .subscribeOn(Schedulers.fromExecutorService(getVertxDelegate().getWorkerPool()))
-                .flatMapMany(aBoolean -> Flux.interval(period))
-                .flatMap(aLong -> {
-                    LocalDateTime threshold = LocalDateTime.now().minus(period);
-                    getServersMap().entrySet()
-                            .stream()
-                            .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
-                            .map(Map.Entry::getKey)
-                            .collect(Collectors.toList())
-                            .forEach(s -> getServersMap().remove(s))
-                    ;
-                    return registerApp();
-                })
-                .subscribe()
-        ;
+        if (getEurekaSettings().getRegisterEurekaClient()) {
+            registerApp()
+                    .subscribeOn(Schedulers.fromExecutorService(getVertxDelegate().getWorkerPool()))
+                    .flatMapMany(aBoolean -> Flux.interval(period))
+                    .flatMap(aLong -> {
+                        LocalDateTime threshold = LocalDateTime.now().minus(period);
+                        getServersMap().entrySet()
+                                .stream()
+                                .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
+                                .map(Map.Entry::getKey)
+                                .collect(Collectors.toList())
+                                .forEach(s -> getServersMap().remove(s))
+                        ;
+                        return registerApp();
+                    })
+                    .subscribe()
+            ;
+        }
     }
 
     public Mono<Map<String, Object>> getAllApps() {
@@ -130,6 +133,26 @@ public class EurekaClient {
          * curl -v -H 'Accept: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps/{APP_ID}
          */
         String key = serviceName.toLowerCase();
+
+        boolean isRegistered = !getEurekaSettings().getRegisterEurekaClient();
+
+        if (isRegistered) {
+            String serviceShouldBeRegisteredKey = MessageFormat.format("eureka.app.{0}.register", key);
+            isRegistered = ConfigProvider.getConfig()
+                    .getOptionalValue(serviceShouldBeRegisteredKey, Boolean.class)
+                    .orElse(true);
+        }
+
+        if (!isRegistered) {
+            String serviceUrlKey = MessageFormat.format("eureka.app.{0}.url", key);
+            return ConfigProvider.getConfig()
+                    .getOptionalValue(serviceUrlKey, String.class)
+                    .map(Mono::just)
+                    .orElseGet (() -> Mono.error(
+                            new RuntimeException("Missing configuration property " + serviceUrlKey)
+                    ));
+        }
+
         if (getServersMap().containsKey(key)) {
             Tuple2<LocalDateTime, List<String>> objects = getServersMap().get(key);
             List<String> t2 = objects.getT2();
@@ -195,7 +218,7 @@ public class EurekaClient {
                 .switchIfEmpty(Mono.error(new RuntimeException("not registered")))
                 //.doOnError(throwable -> log.error("error", throwable))
                 .doOnError(throwable -> log.trace("unable to registerApp", throwable))
-                .retryBackoff(Long.MAX_VALUE, Duration.ofMillis(100), Duration.ofSeconds(15), .5)
+                .retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(15)))
                 .doOnError(throwable -> log.error("unable to registerApp", throwable))
                 ;
     }
@@ -231,7 +254,7 @@ public class EurekaClient {
                 .localHostName(hostName)
                 .app(getAppName())
                 .port(getPort())
-                .eurekaHostName(getHostNameForEureka())
+                .eurekaHostName(getEurekaSettings().getHostNameForEureka())
                 .contextPath(getContextPath().orElse(StringUtils.EMPTY))
                 .ipAddress(hostAddress)
                 .build();
