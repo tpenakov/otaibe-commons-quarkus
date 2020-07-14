@@ -76,26 +76,26 @@ public class StorageProcessor {
             System.setProperty(AWS_SECRET_ACCESS_KEY, getAwsSecretAccessKey().get());
         });
 
-        S3AsyncClientBuilder s3AsyncClientBuilder = createS3AsyncClientBuilder();
-        awsRegion.ifPresent(s -> s3AsyncClientBuilder.region(Region.of(s)));
-        if (getS3AwsEndpoint().isPresent()) {
-            s3AsyncClientBuilder.endpointOverride(new URI(getS3AwsEndpoint().get()));
-        }
-        s3AsyncClient = s3AsyncClientBuilder.build();
+        s3AsyncClient = createS3AsyncClientBuilder().build();
 
         String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
         awsBucket = StringUtils.substring(strip, 0, StringUtils.length(strip) - 1);
         log.info("initialized ensureWrite={}", getEnsureWrite());
     }
 
-    protected S3AsyncClientBuilder createS3AsyncClientBuilder() {
-        return S3AsyncClient.builder()
+    protected S3AsyncClientBuilder createS3AsyncClientBuilder() throws Exception {
+        S3AsyncClientBuilder s3AsyncClientBuilder = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
                         .maxConcurrency(100)
                         .maxPendingConnectionAcquires(10_000)
                         .eventLoopGroupBuilder(SdkEventLoopGroup.builder().numberOfThreads(getNumThreads().orElse(10)))
                 )
                 .credentialsProvider(DefaultCredentialsProvider.create());
+        awsRegion.ifPresent(s -> s3AsyncClientBuilder.region(Region.of(s)));
+        if (getS3AwsEndpoint().isPresent()) {
+            s3AsyncClientBuilder.endpointOverride(new URI(getS3AwsEndpoint().get()));
+        }
+        return s3AsyncClientBuilder;
     }
 
     public <T> Mono<T> readObject(String key, Class<T> tClass) {
