@@ -25,6 +25,7 @@
         <module>otaibe-commons-quarkus-nginx-eureka</module>
         <module>re-read-http-request-body</module>
         <module>keycloak-extension</module>
+        <module>otaibe-commons-quarkus-keycloack-users</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
@@ -36,6 +37,7 @@
         <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
         <vertx.version>3.8.5</vertx.version>
         <mutiny-vertx.version>0.0.13</mutiny-vertx.version>
+        <keycloak.version>9.0.2</keycloak.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.parameters>true</maven.compiler.parameters>
