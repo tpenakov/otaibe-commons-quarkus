@@ -81,6 +81,8 @@ public class EurekaClient {
 
     Map<String, Tuple2<LocalDateTime, List<String>>> serversMap = new ConcurrentHashMap<>();
 
+    Duration period = Duration.ofSeconds(30);
+
     @PostConstruct
     public void init() {
         log.info("init started");
@@ -99,26 +101,29 @@ public class EurekaClient {
         vertxDelegate = (VertxImpl) getVertx().getDelegate();
 
         initInstanceInfo();
-        Duration period = Duration.ofSeconds(30);
 
         if (getEurekaSettings().getRegisterEurekaClient()) {
             registerApp()
                     .subscribeOn(Schedulers.fromExecutorService(getVertxDelegate().getWorkerPool()))
                     .flatMapMany(aBoolean -> Flux.interval(period))
                     .flatMap(aLong -> {
-                        LocalDateTime threshold = LocalDateTime.now().minus(period);
-                        getServersMap().entrySet()
-                                .stream()
-                                .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
-                                .map(Map.Entry::getKey)
-                                .collect(Collectors.toList())
-                                .forEach(s -> getServersMap().remove(s))
-                        ;
+                        fixServersMap();
                         return registerApp();
                     })
                     .subscribe()
             ;
         }
+    }
+
+    protected void fixServersMap() {
+        LocalDateTime threshold = LocalDateTime.now().minus(period);
+        getServersMap().entrySet()
+                .stream()
+                .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList())
+                .forEach(s -> getServersMap().remove(s))
+        ;
     }
 
     public Mono<Map<String, Object>> getAllApps() {
@@ -134,13 +139,17 @@ public class EurekaClient {
          */
         String key = serviceName.toLowerCase();
 
-        boolean isRegistered = !getEurekaSettings().getRegisterEurekaClient();
+        boolean isRegistered = getEurekaSettings().getRegisterEurekaClient();
 
-        if (isRegistered) {
+        if (!isRegistered) {
             String serviceShouldBeRegisteredKey = MessageFormat.format("eureka.app.{0}.register", key);
             isRegistered = ConfigProvider.getConfig()
                     .getOptionalValue(serviceShouldBeRegisteredKey, Boolean.class)
                     .orElse(true);
+        }
+
+        if (!getEurekaSettings().getRegisterEurekaClient()) {
+            fixServersMap();
         }
 
         if (!isRegistered) {
