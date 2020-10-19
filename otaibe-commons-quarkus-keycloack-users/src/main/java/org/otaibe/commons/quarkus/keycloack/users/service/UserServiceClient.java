@@ -7,6 +7,7 @@ import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
 import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
@@ -23,6 +24,7 @@ import java.util.function.Predicate;
 
 @ApplicationScoped
 @Getter
+@Setter
 @Slf4j
 public class UserServiceClient {
     public static final String ROOT_PATH = "/api";
