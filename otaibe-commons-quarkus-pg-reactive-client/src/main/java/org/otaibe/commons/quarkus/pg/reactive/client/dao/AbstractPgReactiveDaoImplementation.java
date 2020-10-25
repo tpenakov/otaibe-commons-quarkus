@@ -82,7 +82,8 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     public Mono<Boolean> deleteById(T data) {
         //String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
         return Mono.from(getClient()
-                .preparedQuery(getDeleteByIdSql(), getIdTuple(data))
+                .preparedQuery(getDeleteByIdSql())
+                .execute(getIdTuple(data))
                 .convert()
                 .toPublisher()
         )
@@ -93,7 +94,8 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
     public Mono<T> findById(T pkData) {
         return Mono.from(getClient()
-                .preparedQuery(getFindByIdSql(), getIdTuple(pkData))
+                .preparedQuery(getFindByIdSql())
+                .execute(getIdTuple(pkData))
                 .convert()
                 .toPublisher()
         )
@@ -109,12 +111,14 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
         return Mono.from(getClient().begin().convert().toPublisher())
                 .flatMap(pgTransaction -> Mono.from(pgTransaction
-                                .preparedQuery(getDeleteByIdSql(), getIdTuple(data))
+                                .preparedQuery(getDeleteByIdSql())
+                                .execute(getIdTuple(data))
                                 .convert()
                                 .toPublisher()
                         )
                                 .zipWhen(rows -> Mono.from(pgTransaction
-                                        .preparedQuery(objects1.getT1(), objects1.getT2())
+                                        .preparedQuery(objects1.getT1())
+                                        .execute(objects1.getT2())
                                         .convert()
                                         .toPublisher()
                                 ))
@@ -129,7 +133,8 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     protected Mono<T> save(Transaction transaction, T data) {
         Tuple2<String, Tuple> objects = prepareForInsert(data);
 
-        return Mono.from(transaction.preparedQuery(objects.getT1(), objects.getT2())
+        return Mono.from(transaction.preparedQuery(objects.getT1())
+                .execute(objects.getT2())
                 .convert()
                 .toPublisher()
         )
@@ -171,12 +176,14 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
         return Mono.from(getClient().begin().convert().toPublisher())
                 .flatMap(pgTransaction -> Mono.from(pgTransaction
-                                .preparedBatch(deleteData.getT1(), deleteData.getT2())
+                                .preparedQuery(deleteData.getT1())
+                                .executeBatch(deleteData.getT2())
                                 .convert()
                                 .toPublisher()
                         )
                                 .zipWhen(rows -> Mono.from(pgTransaction
-                                        .preparedBatch(insertData.getT1(), insertData.getT2())
+                                        .preparedQuery(insertData.getT1())
+                                        .executeBatch(insertData.getT2())
                                         .convert()
                                         .toPublisher()
                                 ))

@@ -31,19 +31,19 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>1.4.2.Final</quarkus.version>
-        <aws.sdk.version>2.10.70</aws.sdk.version>
-        <jackson.version>2.10.3</jackson.version>
-        <reactor-core.version>3.2.11.RELEASE</reactor-core.version>
-        <vertx.version>3.8.5</vertx.version>
-        <mutiny-vertx.version>0.0.13</mutiny-vertx.version>
+        <quarkus.version>1.9.0.Final</quarkus.version>
+        <aws.sdk.version>2.15.14</aws.sdk.version>
+        <jackson.version>2.11.3</jackson.version>
+        <vertx.version>3.9.3</vertx.version>
+        <mutiny-vertx.version>1.2.1</mutiny-vertx.version>
+        <reactor-bom.version>Dysprosium-SR12</reactor-bom.version>
         <keycloak.version>9.0.2</keycloak.version>
+        <graal-vm.version>20.2.0</graal-vm.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.parameters>true</maven.compiler.parameters>
         <compiler-plugin.version>3.8.1</compiler-plugin.version>
         <compiler-plugin.release>11</compiler-plugin.release>
-        <graal-vm.version>19.3.1</graal-vm.version>
     </properties>
 
     <dependencyManagement>
@@ -65,7 +65,7 @@
             <dependency>
                 <groupId>io.projectreactor</groupId>
                 <artifactId>reactor-bom</artifactId>
-                <version>Dysprosium-SR7</version>
+                <version>${reactor-bom.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -198,7 +198,7 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.8</version>
+                <version>1.18.16</version>
             </dependency>
 
             <dependency>

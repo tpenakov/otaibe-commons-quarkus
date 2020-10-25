@@ -5,6 +5,7 @@ import io.quarkus.runtime.annotations.ConfigItem;
 import io.quarkus.runtime.annotations.ConfigPhase;
 import io.quarkus.runtime.annotations.ConfigRoot;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,7 +45,7 @@ public class OtaibeKeycloakConfig {
          * default roles for the realm
          */
         @ConfigItem
-        public String defaultRoles[];
+        public List<String> defaultRoles;
 
         @ConfigGroup
         public static class KeycloakClientConfig {
@@ -72,7 +73,7 @@ public class OtaibeKeycloakConfig {
              * default roles for the client
              */
             @ConfigItem
-            public String defaultRoles[];
+            public List<String> defaultRoles;
         }
     }
 }
