@@ -49,26 +49,20 @@ public class ReactorBackpressureHandler {
                         return Mono.empty();
                     }
                     final int i = numSimultaneous.incrementAndGet();
-                    System.out.println(Thread.currentThread().getName() + " before numSimultaneous=" + i
-                            + " result=" + t
-                    );
+                    log.trace("before numSimultaneous={} result={}", i, t);
                     return Mono.just(t);
                 })
                 .flatMap(t -> handleFn.apply(t))
                 .doOnNext(v -> {
                     final int i = numSimultaneous.decrementAndGet();
                     numProcessed.incrementAndGet();
-                    System.out.println(Thread.currentThread().getName() + " after numSimultaneous=" + i
-                            + " result=" + v
-                    );
+                    log.trace("after numSimultaneous={} result={}", i, v);
+
                     if (buffer.peek() != null) {
                         sink.next(buffer.poll());
                     }
                     if (numProcessed.get() == total.get() && isUpstreamCompleted.get()) {
-                        System.out.println(
-                                Thread.currentThread().getName() + " will complete numProcessed=" + numProcessed
-                                        .get()
-                                        + " total=" + total.get());
+                        log.trace("will complete numProcessed={} total={}", numProcessed.get(), total.get());
                         sink.complete();
                     }
                 });
