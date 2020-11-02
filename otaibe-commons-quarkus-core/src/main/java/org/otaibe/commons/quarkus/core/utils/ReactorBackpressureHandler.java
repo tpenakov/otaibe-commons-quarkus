@@ -34,7 +34,12 @@ public class ReactorBackpressureHandler {
         final Queue<T> buffer = new ConcurrentLinkedQueue<>();
 
         final Flux<T> upstream1 = upstream
-                .doOnComplete(() -> isUpstreamCompleted.set(true))
+                .doOnComplete(() -> {
+                    isUpstreamCompleted.set(true);
+                    if (total.get() == 0l) {
+                        sink.complete();
+                    }
+                })
                 .doOnError(throwable -> sink.error(throwable))
                 .doOnNext(integer -> {
                     total.incrementAndGet();
