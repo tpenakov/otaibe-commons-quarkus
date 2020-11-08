@@ -135,7 +135,7 @@ public class UserServiceClient {
                 .filter(isOkResponse())
                 .doOnError(throwable -> log.error("error user login", throwable))
                 .map(bufferHttpResponse -> bufferHttpResponse.bodyAsString())
-                .doOnNext(s -> log.debug("user is logged in: {}", s))
+                .doOnNext(s -> log.debug("user is logged in"))
                 ;
     }
 
