@@ -6,7 +6,7 @@
     <groupId>org.otaibe.commons.quarkus</groupId>
     <artifactId>otaibe-commons-quarkus</artifactId>
     <packaging>pom</packaging>
-    <version>01.09.10-SNAPSHOT</version>
+    <version>01.09.20-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
@@ -31,7 +31,7 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>1.9.1.Final</quarkus.version>
+        <quarkus.version>1.9.2.Final</quarkus.version>
         <aws.sdk.version>2.15.14</aws.sdk.version>
         <jackson.version>2.11.3</jackson.version>
         <vertx.version>3.9.3</vertx.version>
