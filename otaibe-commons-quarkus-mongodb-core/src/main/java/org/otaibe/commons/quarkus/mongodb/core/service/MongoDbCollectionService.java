@@ -15,6 +15,7 @@ import org.otaibe.commons.quarkus.mongodb.core.utils.BsonUtils;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 
 import javax.inject.Inject;
 import javax.validation.Valid;
@@ -94,7 +95,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
         }
         return Mono.defer(() -> Mono.just(true))
                 .flatMapMany(processor -> Flux.from(find))
-                .retryBackoff(5, Duration.ofMillis(200), Duration.ofSeconds(2))
+                .retryWhen(Retry.backoff(5, Duration.ofMillis(200)))
                 .doOnNext(formOptInBR -> log.debug("found: {}", formOptInBR))
                 .doOnError(throwable -> log.error("byAllNotNullFields error", throwable));
     }

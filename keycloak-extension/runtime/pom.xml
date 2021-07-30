@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.otaibe.commons.quarkus</groupId>
         <artifactId>otaibe-commons-quarkus-keycloak-extension-parent</artifactId>
-        <version>01.09.20-SNAPSHOT</version>
+        <version>01.09.21-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 

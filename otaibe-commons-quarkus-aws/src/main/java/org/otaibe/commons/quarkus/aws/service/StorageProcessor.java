@@ -9,6 +9,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
 import software.amazon.awssdk.core.async.AsyncResponseTransformer;
@@ -137,7 +138,7 @@ public class StorageProcessor {
                         .then(Mono.just((Object) putObjectResponse))
                 )
                 .doOnError(throwable -> log.trace("unable to write text (before retry) with key: " + key, throwable))
-                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
+                .retryWhen(Retry.backoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS)))
                 .doOnError(throwable -> log.error("unable to write text with key: " + key, throwable));
     }
 
@@ -163,7 +164,7 @@ public class StorageProcessor {
                         .then(Mono.just((Object) putObjectResponse))
                 )
                 .doOnError(throwable -> log.trace("unable to write bytes (before retry) with key: " + key, throwable))
-                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
+                .retryWhen(Retry.backoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS)))
                 .doOnError(throwable -> log.error("unable to write bytes with key: " + key, throwable));
     }
 
@@ -213,7 +214,7 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
+                .retryWhen(Retry.backoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS)))
                 .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
                 ;
     }
@@ -244,7 +245,7 @@ public class StorageProcessor {
                         })
         )
                 .next()
-                .retryBackoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS), Duration.ofSeconds(MAX_RETRY_DELAY_SECONDS))
+                .retryWhen(Retry.backoff(NUM_RETRIES, Duration.ofMillis(FIRST_DELAY_MILLIS)))
                 .doOnError(throwable -> log.error("unable to read object with key: " + key, throwable))
                 ;
 

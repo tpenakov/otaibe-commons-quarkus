@@ -108,6 +108,11 @@ public class ControllerUtils {
                 .build();
     }
 
+    public <T> Mono<T> getBody(byte[] body, Class<T> clazz) {
+        return Mono.justOrEmpty(getJsonUtils().readValue(body, clazz))
+                .switchIfEmpty(Mono.<T>error(new RuntimeException("unable to read body as " + clazz)));
+    }
+
     protected <T> Mono<Tuple3<T, Optional<Object>, ObjectMapper>> fillContext(T t) {
         return Mono.subscriberContext()
                 .map(context -> context.getOrEmpty(CLIENT_ERROR_KEY))

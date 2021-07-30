@@ -244,7 +244,7 @@ public class EurekaClient {
                 .doOnNext(s -> log.debug("all apps: {}", s))
                 .map(s -> (Map<String, Object>) getJsonUtils().readValue(s, Map.class, getObjectMapper()).get())
                 //.doOnError(throwable -> log.error("error", throwable))
-                .retryBackoff(10, Duration.ofMillis(100), Duration.ofSeconds(1), .5)
+                .retryWhen(Retry.backoff(10, Duration.ofMillis(100)))
                 .doOnError(throwable -> log.error(MessageFormat.format("unable to get apps for {0}", path), throwable))
                 ;
     }
