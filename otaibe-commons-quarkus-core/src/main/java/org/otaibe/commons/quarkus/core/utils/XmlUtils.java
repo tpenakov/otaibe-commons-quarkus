@@ -55,7 +55,8 @@ public class XmlUtils {
         transformerFactory = TransformerFactory.newInstance();
     }
 
-    public String objToXmlString(Object object, Marshaller marshaller) throws Exception {
+    //JAXB marshallers are not necessarily thread-safe.
+    public synchronized String objToXmlString(Object object, Marshaller marshaller) throws Exception {
         StringWriter stringWriter = new StringWriter();
         marshaller.marshal(object, new StreamResult(stringWriter));
         return stringWriter.toString();
@@ -69,7 +70,8 @@ public class XmlUtils {
         return xmlStringToObject(null, xml, unmarshaller);
     }
 
-    public <T extends Object> T xmlStringToObject(Class<T> clazz, String xml, Unmarshaller unmarshaller) {
+    //JAXB unmarshallers are not necessarily thread-safe.
+    public synchronized <T extends Object> T xmlStringToObject(Class<T> clazz, String xml, Unmarshaller unmarshaller) {
         try {
             T result = (T) unmarshaller.unmarshal(
                     new StreamSource(
