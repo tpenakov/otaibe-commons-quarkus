@@ -56,24 +56,24 @@ public class XmlUtils {
     }
 
     //JAXB marshallers are not necessarily thread-safe.
-    public synchronized String objToXmlString(Object object, Marshaller marshaller) throws Exception {
+    public String objToXmlString(Object object, ThreadLocal<Marshaller> marshaller) throws Exception {
         StringWriter stringWriter = new StringWriter();
-        marshaller.marshal(object, new StreamResult(stringWriter));
+        marshaller.get().marshal(object, new StreamResult(stringWriter));
         return stringWriter.toString();
     }
 
-    public Object toStringLazy(Object object, Marshaller marshaller) {
+    public Object toStringLazy(Object object, ThreadLocal<Marshaller> marshaller) {
         return new ToStringLazy(object, marshaller, this);
     }
 
-    public <T extends Object> T xmlStringToObject(String xml, Unmarshaller unmarshaller) {
+    public <T extends Object> T xmlStringToObject(String xml, ThreadLocal<Unmarshaller> unmarshaller) {
         return xmlStringToObject(null, xml, unmarshaller);
     }
 
     //JAXB unmarshallers are not necessarily thread-safe.
-    public synchronized <T extends Object> T xmlStringToObject(Class<T> clazz, String xml, Unmarshaller unmarshaller) {
+    public <T extends Object> T xmlStringToObject(Class<T> clazz, String xml, ThreadLocal<Unmarshaller> unmarshaller) {
         try {
-            T result = (T) unmarshaller.unmarshal(
+            T result = (T) unmarshaller.get().unmarshal(
                     new StreamSource(
                             new StringReader(xml))
             );
@@ -83,7 +83,7 @@ public class XmlUtils {
         }
     }
 
-    public <T extends Object> T deepClone(T input, Marshaller marshaller, Unmarshaller unmarshaller) {
+    public <T extends Object> T deepClone(T input, ThreadLocal<Marshaller> marshaller, ThreadLocal<Unmarshaller> unmarshaller) {
         String s = toStringLazy(input, marshaller).toString();
         return xmlStringToObject(s, unmarshaller);
     }
@@ -174,7 +174,7 @@ public class XmlUtils {
     @AllArgsConstructor
     private static class ToStringLazy {
         private Object input;
-        private Marshaller marshaller;
+        private ThreadLocal<Marshaller> marshaller;
         private XmlUtils utils;
 
         @Override
