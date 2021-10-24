@@ -2,9 +2,8 @@ package org.otaibe.commons.quarkus.core.utils;
 
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.UnicastProcessor;
+import reactor.core.publisher.Sinks;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -18,6 +17,10 @@ import java.util.function.Function;
  */
 @Slf4j
 public class ReactorBackpressureHandler {
+    public static final Sinks.EmitFailureHandler DEFAULT_EMIT_FAILURE_HANDLER =
+            (signalType, emitResult) ->
+                    emitResult.equals(Sinks.EmitResult.FAIL_NON_SERIALIZED) ? true : false;
+
     public static ReactorBackpressureHandler of() {
         return new ReactorBackpressureHandler();
     }
@@ -29,24 +32,23 @@ public class ReactorBackpressureHandler {
         final AtomicLong total = new AtomicLong(0);
         final AtomicBoolean isUpstreamCompleted = new AtomicBoolean(false);
         final AtomicLong numProcessed = new AtomicLong(0);
-        final UnicastProcessor<T> processor = UnicastProcessor.create();
-        final FluxSink<T> sink = processor.sink(FluxSink.OverflowStrategy.BUFFER);
+        final Sinks.Many<T> sink =  Sinks.many().unicast().<T>onBackpressureBuffer();
         final Queue<T> buffer = new ConcurrentLinkedQueue<>();
 
         final Flux<T> upstream1 = upstream
                 .doOnComplete(() -> {
                     isUpstreamCompleted.set(true);
                     if (total.get() == 0l) {
-                        sink.complete();
+                        sink.emitComplete(DEFAULT_EMIT_FAILURE_HANDLER);
                     }
                 })
-                .doOnError(throwable -> sink.error(throwable))
+                .doOnError(throwable -> sink.emitError(throwable, DEFAULT_EMIT_FAILURE_HANDLER))
                 .doOnNext(integer -> {
                     total.incrementAndGet();
-                    sink.next(integer);
+                    sink.emitNext(integer, DEFAULT_EMIT_FAILURE_HANDLER);
                 });
 
-        return processor
+        return sink.asFlux()
                 .doOnSubscribe(subscription -> upstream1.subscribe())
                 .flatMap(t -> {
                     if (numSimultaneous.get() >= rate) {
@@ -64,11 +66,11 @@ public class ReactorBackpressureHandler {
                     log.trace("after numSimultaneous={} result={}", i, v);
 
                     if (buffer.peek() != null) {
-                        sink.next(buffer.poll());
+                        sink.emitNext(buffer.poll(), DEFAULT_EMIT_FAILURE_HANDLER);
                     }
                     if (numProcessed.get() == total.get() && isUpstreamCompleted.get()) {
                         log.trace("will complete numProcessed={} total={}", numProcessed.get(), total.get());
-                        sink.complete();
+                        sink.emitComplete(DEFAULT_EMIT_FAILURE_HANDLER);
                     }
                 });
     }
