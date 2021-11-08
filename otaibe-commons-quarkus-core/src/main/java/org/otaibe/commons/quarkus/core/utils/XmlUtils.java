@@ -57,8 +57,15 @@ public class XmlUtils {
 
     //JAXB marshallers are not necessarily thread-safe.
     public String objToXmlString(Object object, ThreadLocal<Marshaller> marshaller) throws Exception {
+        if (marshaller == null) {
+            log.error("null ThreadLocal<Marshaller>");
+        }
         StringWriter stringWriter = new StringWriter();
-        marshaller.get().marshal(object, new StreamResult(stringWriter));
+        final Marshaller marshaller1 = marshaller.get();
+        if (marshaller1 == null) {
+            log.error("null marshaller");
+        }
+        marshaller1.marshal(object, new StreamResult(stringWriter));
         return stringWriter.toString();
     }
 
