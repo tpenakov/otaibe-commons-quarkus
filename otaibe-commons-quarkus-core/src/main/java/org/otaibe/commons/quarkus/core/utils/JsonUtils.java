@@ -54,11 +54,11 @@ public class JsonUtils {
 
     }
 
-    public Map toMap(Object input) {
+    public Map<String, Object> toMap(Object input) {
         return toMap(input, getObjectMapper());
     }
 
-    public Map toMap(Object input, ObjectMapper objectMapper) {
+    public Map<String, Object> toMap(Object input, ObjectMapper objectMapper) {
         return toMap(input, objectMapper, new HashMap<>());
     }
 
