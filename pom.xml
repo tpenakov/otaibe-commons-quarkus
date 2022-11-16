@@ -33,7 +33,7 @@
     <properties>
         <quarkus.version>1.9.2.Final</quarkus.version>
         <aws.sdk.version>2.15.14</aws.sdk.version>
-        <jackson.version>2.13.4</jackson.version>
+        <jackson.version>2.14.0</jackson.version>
         <vertx.version>3.9.4</vertx.version>
         <mutiny-vertx.version>1.2.1</mutiny-vertx.version>
         <reactor-bom.version>2020.0.9</reactor-bom.version>
