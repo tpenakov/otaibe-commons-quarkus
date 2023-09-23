@@ -6,7 +6,7 @@
     <groupId>org.otaibe.commons.quarkus</groupId>
     <artifactId>otaibe-commons-quarkus</artifactId>
     <packaging>pom</packaging>
-    <version>01.09.24-SNAPSHOT</version>
+    <version>03.04.10-SNAPSHOT</version>
     <modules>
         <module>otaibe-commons-quarkus-core</module>
         <module>otaibe-commons-quarkus-rest</module>
@@ -31,21 +31,34 @@
     <name>otaibe-commons-quarkus</name>
 
     <properties>
-        <quarkus.version>1.9.2.Final</quarkus.version>
-        <aws.sdk.version>2.15.14</aws.sdk.version>
-        <jackson.version>2.14.0</jackson.version>
-        <vertx.version>3.9.4</vertx.version>
-        <mutiny-vertx.version>1.2.1</mutiny-vertx.version>
-        <reactor-bom.version>2020.0.9</reactor-bom.version>
-        <keycloak.version>9.0.2</keycloak.version>
-        <graal-vm.version>20.2.0</graal-vm.version>
+        <quarkus.version>3.4.1</quarkus.version>
+        <aws.sdk.version>2.20.143</aws.sdk.version>
+        <jackson.version>2.15.2</jackson.version>
+        <vertx.version>4.4.5</vertx.version>
+        <mutiny-vertx.version>3.6.0</mutiny-vertx.version>
+        <reactor-bom.version>2022.0.11</reactor-bom.version>
+        <keycloak.version>22.0.1</keycloak.version>
+        <graal-vm.version>23.0.1</graal-vm.version>
+        <microprofile-config-api.version>3.0.3</microprofile-config-api.version>
+        <jakarta.persistence-api.version>3.1.0</jakarta.persistence-api.version>
+        <jakarta.enterprise.cdi-api.version>4.0.1</jakarta.enterprise.cdi-api.version>
+        <jakarta.validation-api.version>3.0.2</jakarta.validation-api.version>
+        <jakarta.annotation-api.version>2.1.1</jakarta.annotation-api.version>
+        <jboss-jaxb-api_2.3_spec.version>2.0.1.Final</jboss-jaxb-api_2.3_spec.version>
+        <jboss-jaxrs-api_2.1_spec.version>2.0.2.Final</jboss-jaxrs-api_2.1_spec.version>
+        <commons-lang3.version>3.13.0</commons-lang3.version>
+        <commons-io.version>2.13.0</commons-io.version>
+        <commons-collections4.version>4.4</commons-collections4.version>
+        <mongodb.bson.version>4.10.2</mongodb.bson.version>
+        <commons-validator.version>1.7</commons-validator.version>
+        <joda-time.version>2.12.5</joda-time.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.parameters>true</maven.compiler.parameters>
-        <compiler-plugin.version>3.8.1</compiler-plugin.version>
-        <compiler-plugin.release>11</compiler-plugin.release>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <compiler-plugin.version>3.11.0</compiler-plugin.version>
+        <compiler-plugin.release>17</compiler-plugin.release>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <dependencyManagement>
@@ -75,7 +88,7 @@
             <dependency>
                 <groupId>org.eclipse.microprofile.config</groupId>
                 <artifactId>microprofile-config-api</artifactId>
-                <version>1.3</version>
+                <version>${microprofile-config-api.version}</version>
             </dependency>
 
             <dependency>
@@ -112,40 +125,40 @@
             <dependency>
                 <groupId>jakarta.persistence</groupId>
                 <artifactId>jakarta.persistence-api</artifactId>
-                <version>2.2.3</version>
+                <version>${jakarta.persistence-api.version}</version>
             </dependency>
             <dependency>
                 <groupId>jakarta.enterprise</groupId>
                 <artifactId>jakarta.enterprise.cdi-api</artifactId>
-                <version>2.0.2</version>
+                <version>${jakarta.enterprise.cdi-api.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>jakarta.validation</groupId>
                 <artifactId>jakarta.validation-api</artifactId>
-                <version>2.0.2</version>
+                <version>${jakarta.validation-api.version}</version>
             </dependency>
             <dependency>
                 <groupId>jakarta.annotation</groupId>
                 <artifactId>jakarta.annotation-api</artifactId>
-                <version>1.3.5</version>
+                <version>${jakarta.annotation-api.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.jboss.spec.javax.xml.bind</groupId>
                 <artifactId>jboss-jaxb-api_2.3_spec</artifactId>
-                <version>2.0.0.Final</version>
+                <version>${jboss-jaxb-api_2.3_spec.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.jboss.spec.javax.ws.rs</groupId>
                 <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
-                <version>1.0.2.Final</version>
+                <version>${jboss-jaxrs-api_2.1_spec.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
-                <version>1.7.25</version>
+                <version>2.0.9</version>
             </dependency>
 
             <dependency>
@@ -167,40 +180,40 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
-                <version>3.8.1</version>
+                <version>${commons-lang3.version}</version>
             </dependency>
             <dependency>
                 <groupId>commons-io</groupId>
                 <artifactId>commons-io</artifactId>
-                <version>2.7</version>
+                <version>${commons-io.version}</version>
             </dependency>
             <dependency>
-                <groupId>commons-collections</groupId>
-                <artifactId>commons-collections</artifactId>
-                <version>3.2.2</version>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>${commons-collections4.version}</version>
             </dependency>
             <dependency>
                 <groupId>commons-validator</groupId>
                 <artifactId>commons-validator</artifactId>
-                <version>1.6</version>
+                <version>${commons-validator.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.mongodb</groupId>
                 <artifactId>bson</artifactId>
-                <version>3.10.2</version>
+                <version>${mongodb.bson.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>joda-time</groupId>
                 <artifactId>joda-time</artifactId>
-                <version>2.10.3</version>
+                <version>${joda-time.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.16</version>
+                <version>1.18.30</version>
             </dependency>
 
             <dependency>

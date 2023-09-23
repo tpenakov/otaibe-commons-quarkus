@@ -4,6 +4,13 @@ import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Row;
 import io.vertx.mutiny.sqlclient.Transaction;
 import io.vertx.mutiny.sqlclient.Tuple;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -16,14 +23,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
-
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import java.text.MessageFormat;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -65,11 +64,10 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
     @PostConstruct
     public void init() {
         log.info("init started");
-        T dummyEntityWithAllFields = createDummyEntityWithAllFields();
-        //log.info("init dummyEntityWithAllFields={}", dummyEntityWithAllFields);
-        Map<String, Object> entity = getJsonUtils().toMap(
-                dummyEntityWithAllFields,
-                getJsonConfig().getDbPropsNamesMapper());
+    final T dummyEntityWithAllFields = createDummyEntityWithAllFields();
+    // log.info("init dummyEntityWithAllFields={}", dummyEntityWithAllFields);
+    final Map<String, Object> entity =
+        getJsonUtils().toMap(dummyEntityWithAllFields, getJsonConfig().getDbPropsNamesMapper());
         //log.info("init entity={}", entity);
         allColumnsHeader = StringUtils.join(entity.keySet(), COMMA);
         fillSelectFromSql();
@@ -79,59 +77,61 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
         log.info("init completed");
     }
 
-    public Mono<Boolean> deleteById(T data) {
-        //String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
-        return Mono.from(getClient()
+  public Mono<Boolean> deleteById(final T data) {
+    // String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
+    return Mono.fromCompletionStage(
+            getClient()
                 .preparedQuery(getDeleteByIdSql())
                 .execute(getIdTuple(data))
                 .convert()
-                .toPublisher()
-        )
-                .doOnNext(rows -> log.trace("delete data: {}", rows))
-                .map(rows -> rows.rowCount() == 1);
-
+                .toCompletionStage())
+        .doOnNext(rows -> log.trace("delete data: {}", rows))
+        .map(rows -> rows.rowCount() == 1);
     }
 
-    public Mono<T> findById(T pkData) {
-        return Mono.from(getClient()
+  public Mono<T> findById(final T pkData) {
+    return Mono.fromCompletionStage(
+            getClient()
                 .preparedQuery(getFindByIdSql())
                 .execute(getIdTuple(pkData))
                 .convert()
-                .toPublisher()
-        )
-                .flatMapMany(rows -> Flux.fromIterable(rows))
-                .next()
-                .map(row -> fromRow(row))
-                ;
+                .toCompletionStage())
+        .flatMapMany(rows -> Flux.fromIterable(rows))
+        .next()
+        .map(row -> fromRow(row));
     }
 
-    public Mono<T> save(T data) {
+  public Mono<T> save(final T data) {
 
-        Tuple2<String, Tuple> objects1 = prepareForInsert(data);
+    final Tuple2<String, Tuple> objects1 = prepareForInsert(data);
 
-        return Mono.from(getClient().begin().convert().toPublisher())
-                .flatMap(pgTransaction -> Mono.from(pgTransaction
-                                .preparedQuery(getDeleteByIdSql())
-                                .execute(getIdTuple(data))
-                                .convert()
-                                .toPublisher()
-                        )
-                                .zipWhen(rows -> Mono.from(pgTransaction
-                                        .preparedQuery(objects1.getT1())
-                                        .execute(objects1.getT2())
-                                        .convert()
-                                        .toPublisher()
-                                ))
-                                .zipWhen(objects -> Mono.from(pgTransaction.commit().convert().toPublisher())
-                                        .then(Mono.just(true))
-                                )
-                )
-                .doOnNext(rows -> log.trace("save data: {}", rows))
-                .map(rows -> data);
+    return Mono.from(getClient().begin().convert().toPublisher())
+        .flatMap(
+            pgTransaction ->
+                Mono.from(
+                        pgTransaction
+                            .preparedQuery(getDeleteByIdSql())
+                            .execute(getIdTuple(data))
+                            .convert()
+                            .toPublisher())
+                    .zipWhen(
+                        rows ->
+                            Mono.from(
+                                pgTransaction
+                                    .preparedQuery(objects1.getT1())
+                                    .execute(objects1.getT2())
+                                    .convert()
+                                    .toPublisher()))
+                    .zipWhen(
+                        objects ->
+                            Mono.from(pgTransaction.commit().convert().toPublisher())
+                                .then(Mono.just(true))))
+        .doOnNext(rows -> log.trace("save data: {}", rows))
+        .map(rows -> data);
     }
 
-    protected Mono<T> save(Transaction transaction, T data) {
-        Tuple2<String, Tuple> objects = prepareForInsert(data);
+  protected Mono<T> save(final Transaction transaction, final T data) {
+    final Tuple2<String, Tuple> objects = prepareForInsert(data);
 
         return Mono.from(transaction.preparedQuery(objects.getT1())
                 .execute(objects.getT2())
@@ -141,38 +141,45 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
                 .map(rows -> data);
     }
 
-
-    public Mono<Boolean> batchSave(List<T> dataList) {
+  public Mono<Boolean> batchSave(final List<T> dataList) {
         if (CollectionUtils.isEmpty(dataList)) {
             return Mono.just(true);
         }
 
-        List<Tuple2<Tuple2<String, Tuple>, Tuple2<String, Tuple>>> batchData = dataList.stream()
-                .map(containersStats ->
-                        Tuples.of(
-                                prepareForInsert(containersStats),
-                                Tuples.of(getDeleteByIdSql(), getIdTuple(containersStats))
-                        )
-                )
-                .collect(Collectors.toList());
+    final List<Tuple2<Tuple2<String, Tuple>, Tuple2<String, Tuple>>> batchData =
+        dataList.stream()
+            .map(
+                containersStats ->
+                    Tuples.of(
+                        prepareForInsert(containersStats),
+                        Tuples.of(getDeleteByIdSql(), getIdTuple(containersStats))))
+            .collect(Collectors.toList());
 
-        Tuple2<String, List<Tuple>> deleteData = batchData.stream()
-                .map(objects -> Tuples.of(objects.getT2().getT1(), Arrays.asList(objects.getT2().getT2())))
-                .reduce((objects, objects2) -> {
-                    List<Tuple> list = new ArrayList(objects.getT2());
-                    list.addAll(objects2.getT2());
-                    return Tuples.of(objects.getT1(), list);
+    final Tuple2<String, List<Tuple>> deleteData =
+        batchData.stream()
+            .map(
+                objects ->
+                    Tuples.of(objects.getT2().getT1(), Arrays.asList(objects.getT2().getT2())))
+            .reduce(
+                (objects, objects2) -> {
+                  final List<Tuple> list = new ArrayList(objects.getT2());
+                  list.addAll(objects2.getT2());
+                  return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create delete data batch"));
+            .orElseThrow(() -> new RuntimeException("unable to create delete data batch"));
 
-        Tuple2<String, List<Tuple>> insertData = batchData.stream()
-                .map(objects -> Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
-                .reduce((objects, objects2) -> {
-                    List<Tuple> list = new ArrayList(objects.getT2());
-                    list.addAll(objects2.getT2());
-                    return Tuples.of(objects.getT1(), list);
+    final Tuple2<String, List<Tuple>> insertData =
+        batchData.stream()
+            .map(
+                objects ->
+                    Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
+            .reduce(
+                (objects, objects2) -> {
+                  final List<Tuple> list = new ArrayList(objects.getT2());
+                  list.addAll(objects2.getT2());
+                  return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create insert data batch"));
+            .orElseThrow(() -> new RuntimeException("unable to create insert data batch"));
 
         return Mono.from(getClient().begin().convert().toPublisher())
                 .flatMap(pgTransaction -> Mono.from(pgTransaction
@@ -196,21 +203,23 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
 
     }
 
-    public Tuple2<String, Tuple> prepareForInsert(T data) {
-        Map<String, Object> entity = getJsonUtils().toMap(data, getJsonConfig().getDbPropsNamesMapper());
+  public Tuple2<String, Tuple> prepareForInsert(final T data) {
+    final Map<String, Object> entity =
+        getJsonUtils().toMap(data, getJsonConfig().getDbPropsNamesMapper());
         fixDataMap(data, entity);
 
-        List<Object> values = new ArrayList<>();
-        List<String> keys = entity.entrySet().stream()
-                .filter(entry -> null != entry.getValue())
-                .map(entry -> {
-                    values.add(entry.getValue());
-                    return entry.getKey();
+    final List<Object> values = new ArrayList<>();
+    final List<String> keys =
+        entity.entrySet().stream()
+            .filter(entry -> null != entry.getValue())
+            .map(
+                entry -> {
+                  values.add(entry.getValue());
+                  return entry.getKey();
                 })
-                .collect(Collectors.toList());
+            .collect(Collectors.toList());
 
-
-        Object firstValue = values.get(0);
+    final Object firstValue = values.get(0);
 
         Object nextValues[] = values.size() <= 1 ? null : (
                 new Object[]{values.get(1)}
@@ -220,21 +229,23 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
             nextValues = ArrayUtils.addAll(nextValues, values.get(i));
         }
 
-        String headers = StringUtils.join(keys, COMMA);
+    final String headers = StringUtils.join(keys, COMMA);
 
-        AtomicInteger numParam = new AtomicInteger();
-        List<String> paramsList = values.stream()
-                .map(o -> new StringBuilder().append('$').append(numParam.incrementAndGet()).toString())
-                .collect(Collectors.toList());
-        String valuesString = StringUtils.join(paramsList, COMMA);
+    final AtomicInteger numParam = new AtomicInteger();
+    final List<String> paramsList =
+        values.stream()
+            .map(o -> new StringBuilder().append('$').append(numParam.incrementAndGet()).toString())
+            .collect(Collectors.toList());
+    final String valuesString = StringUtils.join(paramsList, COMMA);
 
-        String sql = MessageFormat.format(INSERT_INTO, getTableName(), headers, valuesString);
+    final String sql = MessageFormat.format(INSERT_INTO, getTableName(), headers, valuesString);
 
-        Object nextValues1[] = ArrayUtils.clone(nextValues);
+    final Object[] nextValues1 = ArrayUtils.clone(nextValues);
 
-        Tuple tuple = Optional.ofNullable(nextValues)
-                .map(objects -> new Tuple(io.vertx.sqlclient.Tuple.of(firstValue, nextValues1)))
-                .orElseGet(() -> Tuple.of(firstValue));
+    final Tuple tuple =
+        Optional.ofNullable(nextValues)
+            .map(objects -> new Tuple(io.vertx.sqlclient.Tuple.of(firstValue, nextValues1)))
+            .orElseGet(() -> Tuple.of(firstValue));
         return Tuples.of(sql, tuple);
 
     }
@@ -251,7 +262,7 @@ public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
         deleteByIdSql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
     }
 
-    protected Tuple getIdTuple(T entity) {
+  protected Tuple getIdTuple(final T entity) {
         return Tuple.of(getId(entity));
     }
 

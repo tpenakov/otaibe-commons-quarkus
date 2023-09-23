@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j

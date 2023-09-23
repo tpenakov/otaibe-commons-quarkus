@@ -6,6 +6,12 @@ import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.HttpResponse;
 import io.vertx.mutiny.ext.web.client.WebClient;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.text.MessageFormat;
+import java.util.function.Predicate;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriBuilder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -14,15 +20,6 @@ import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import org.otaibe.commons.quarkus.keycloack.users.settings.UserServiceSettings;
 import reactor.core.publisher.Mono;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
-import java.text.MessageFormat;
-import java.util.function.Predicate;
-
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j
@@ -54,34 +51,34 @@ public class UserServiceClient {
                 getSettings().getSsl(),
                 getSettings().getHost(),
                 getSettings().getPort());
-        this.client = WebClient.create(getVertx(),
+        client = WebClient.create(getVertx(),
                 new WebClientOptions()
                         .setDefaultHost(getSettings().getHost())
                         .setDefaultPort(getSettings().getPort())
                         .setSsl(getSettings().getSsl()));
 
-        this.apiPath = UriBuilder.fromPath(getSettings().getContextPath())
+        apiPath = UriBuilder.fromPath(getSettings().getContextPath())
                 .path(ROOT_PATH)
         ;
     }
 
 
-    public Mono<UserRepresentation> createUser(UserRepresentation user) {
+    public Mono<UserRepresentation> createUser(final UserRepresentation user) {
         return upsertUser(user, getPath(CREATE_USER))
                 .doOnError(throwable -> log.error("error create user", throwable))
                 .doOnNext(userRepresentation -> log.debug("user is created: {}", getJsonUtils().toStringLazy(userRepresentation)))
         ;
     }
 
-    public Mono<UserRepresentation> updateUser(UserRepresentation user) {
+    public Mono<UserRepresentation> updateUser(final UserRepresentation user) {
         return upsertUser(user, getPath(UPDATE_USER))
                 .doOnError(throwable -> log.error("error update user", throwable))
                 .doOnNext(userRepresentation -> log.debug("user is updated: {}", getJsonUtils().toStringLazy(userRepresentation)))
         ;
     }
 
-    public Mono<UserRepresentation> checkIsUserExists(UserRepresentation user) {
-        String path = getPath(CHECK_IS_USER_EXISTS);
+    public Mono<UserRepresentation> checkIsUserExists(final UserRepresentation user) {
+        final String path = getPath(CHECK_IS_USER_EXISTS);
 
         return getClient()
                 .post(path)
@@ -94,8 +91,8 @@ public class UserServiceClient {
                 .doOnNext(userRepresentation -> log.debug("checkIsUserExists result: {}", getJsonUtils().toStringLazy(userRepresentation)));
     }
 
-    public Mono<UserRepresentation> getUserById(String id) {
-        String path = getPath(MessageFormat.format("{0}/{1}", GET_USER, id));
+    public Mono<UserRepresentation> getUserById(final String id) {
+        final String path = getPath(MessageFormat.format("{0}/{1}", GET_USER, id));
 
         return getClient()
                 .get(path)
@@ -108,8 +105,8 @@ public class UserServiceClient {
                 .doOnNext(userRepresentation -> log.debug("getUserById result: {}", getJsonUtils().toStringLazy(userRepresentation)));
     }
 
-    public Mono<Boolean> deleteUser(UserRepresentation user) {
-        String path = getPath(DELETE_USER);
+    public Mono<Boolean> deleteUser(final UserRepresentation user) {
+        final String path = getPath(DELETE_USER);
 
         return getClient()
                 .post(path)
@@ -124,8 +121,8 @@ public class UserServiceClient {
                 ;
     }
 
-    public Mono<String> userLogin(UserRepresentation user) {
-        String path = getPath(USER_LOGIN);
+    public Mono<String> userLogin(final UserRepresentation user) {
+        final String path = getPath(USER_LOGIN);
 
         return getClient()
                 .post(path)
@@ -140,7 +137,7 @@ public class UserServiceClient {
     }
 
 
-    Mono<UserRepresentation> upsertUser(UserRepresentation user, String path) {
+    Mono<UserRepresentation> upsertUser(final UserRepresentation user, final String path) {
         return getClient()
                 .post(path)
                 .sendJson(user)
@@ -153,7 +150,7 @@ public class UserServiceClient {
 
     Predicate<HttpResponse<Buffer>> isOkResponse() {
         return response -> {
-            boolean isOk = response.statusCode() == Response.Status.OK.getStatusCode();
+            final boolean isOk = response.statusCode() == Response.Status.OK.getStatusCode();
             if (!isOk) {
                 log.error("unexpected status: {} body: {}", response.statusCode(), response.bodyAsString());
             }
@@ -161,6 +158,6 @@ public class UserServiceClient {
         };
     }
 
-    String getPath(String subPath) {
+    String getPath(final String subPath) {
         return getApiPath().clone().path(subPath).build().getPath();
     }}

@@ -1,23 +1,20 @@
 package org.otaibe.commons.quarkus.core.utils;
 
-import lombok.Getter;
-import lombok.Setter;
-
-import javax.enterprise.context.ApplicationScoped;
-import javax.enterprise.context.spi.CreationalContext;
-import javax.enterprise.inject.spi.Bean;
-import javax.enterprise.inject.spi.BeanManager;
+import jakarta.enterprise.context.spi.CreationalContext;
+import jakarta.enterprise.inject.spi.Bean;
+import jakarta.enterprise.inject.spi.BeanManager;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import lombok.Getter;
+import lombok.Setter;
 
-@ApplicationScoped
 @Getter
 @Setter
 public class BeanManagerUtils {
 
-    public <T> List<T> getReferences(BeanManager beanManager, Class<T> clazz) {
-        Set<Bean<?>> beans = beanManager.getBeans(clazz);
+    public <T> List<T> getReferences(final BeanManager beanManager, final Class<T> clazz) {
+        final Set<Bean<?>> beans = beanManager.getBeans(clazz);
         return beans.stream()
                 .map(bean1 -> bean1.getTypes()
                         .stream()
@@ -32,18 +29,18 @@ public class BeanManagerUtils {
                 .collect(Collectors.toList());
     }
 
-    public <T> T createBean(BeanManager beanManager, Class<T> clazz) {
-        Set<Bean<?>> beans = beanManager.getBeans(clazz);
+    public <T> T createBean(final BeanManager beanManager, final Class<T> clazz) {
+        final Set<Bean<?>> beans = beanManager.getBeans(clazz);
         return createBean(beanManager, clazz, beans);
     }
 
-    public <T> T createBean(BeanManager beanManager, String name, Class<T> clazz) {
-        Set<Bean<?>> beans = beanManager.getBeans(name);
+    public <T> T createBean(final BeanManager beanManager, final String name, final Class<T> clazz) {
+        final Set<Bean<?>> beans = beanManager.getBeans(name);
         return createBean(beanManager, clazz, beans);
     }
 
-    public <T> T createBean(BeanManager beanManager, Class<T> clazz, Set<Bean<?>> beans) {
-        Bean<?> bean = beans.stream()
+    public <T> T createBean(final BeanManager beanManager, final Class<T> clazz, final Set<Bean<?>> beans) {
+        final Bean<?> bean = beans.stream()
                 .filter(bean1 -> bean1.getTypes()
                         .stream()
                         .filter(type -> type.equals(clazz))
@@ -52,7 +49,7 @@ public class BeanManagerUtils {
                 )
                 .findFirst()
                 .get();
-        CreationalContext<?> creationalContext = beanManager.createCreationalContext(bean);
+        final CreationalContext<?> creationalContext = beanManager.createCreationalContext(bean);
 
         return (T) beanManager.getReference(
                 bean,

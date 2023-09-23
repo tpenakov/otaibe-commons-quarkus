@@ -1,13 +1,12 @@
 package org.otaibe.commons.quarkus.rest.service;
 
+import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import javax.validation.constraints.NotNull;
-import java.util.List;
 
 @Getter
 @Slf4j
@@ -18,12 +17,12 @@ public abstract class RestService<RQ, RS> {
 
     protected abstract RS createRs();
 
-    protected RestService(List<RestProcessor> processors, JsonUtils jsonUtils) {
+    protected RestService(final List<RestProcessor> processors, final JsonUtils jsonUtils) {
         this.processors = processors;
         this.jsonUtils = jsonUtils;
     }
 
-    public Mono<RS> process(@NotNull RQ rq) {
+    public Mono<RS> process(@NotNull final RQ rq) {
         return Mono.just(createRs())
                 .flatMap(rs -> Flux.fromIterable(getProcessors())
                         .flatMap(restProcessor -> restProcessor.process(rq, rs))

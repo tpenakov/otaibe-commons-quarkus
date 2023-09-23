@@ -5,9 +5,6 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.enterprise.context.ApplicationScoped;
-
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j

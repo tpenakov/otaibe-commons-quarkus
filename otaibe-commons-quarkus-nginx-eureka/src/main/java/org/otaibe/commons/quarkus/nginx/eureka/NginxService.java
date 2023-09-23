@@ -1,6 +1,14 @@
 package org.otaibe.commons.quarkus.nginx.eureka;
 
 import io.vertx.mutiny.core.Vertx;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.text.MessageFormat;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,15 +18,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.otaibe.commons.quarkus.eureka.client.service.EurekaClient;
 import reactor.core.publisher.Mono;
-
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import java.text.MessageFormat;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @Getter(AccessLevel.PROTECTED)
 @Setter(AccessLevel.PROTECTED)
@@ -95,7 +94,7 @@ public abstract class NginxService {
 
     public abstract String getNginxConfig();
 
-    protected Optional<String> buildUpstreamServers(List<String> servers) {
+  protected Optional<String> buildUpstreamServers(final List<String> servers) {
         if (CollectionUtils.isEmpty(servers)) {
             return Optional.of(badGatewayServer);
         }
@@ -104,36 +103,39 @@ public abstract class NginxService {
                 .reduce((s, s1) -> StringUtils.join(s, s1, "\n"));
     }
 
-    protected List<String> getServers(String name) {
-        Collection<String> servers = new ConcurrentLinkedQueue<>();
-        AtomicBoolean found = new AtomicBoolean(false);
+  protected List<String> getServers(final String name) {
+    final Collection<String> servers = new ConcurrentLinkedQueue<>();
+    final AtomicBoolean found = new AtomicBoolean(false);
 
-        return Mono.defer(() -> getEurekaClient().getNextServer(name))
-                .map(s -> {
-                    found.set(found.get() || servers.contains(s));
-                    boolean isFound = found.get();
-                    if (!isFound) {
-                        servers.add(s);
-                        return s;
-                    }
-                    return StringUtils.EMPTY;
-                })
-                .onErrorResume(throwable -> {
-                    found.set(true);
-                    return Mono.just(StringUtils.EMPTY);
-                })
-                .repeat(() -> !found.get())
-                .filter(s -> StringUtils.isNotBlank(s))
-                .map(s -> {
-                    String s1 = StringUtils.replace(s, "http://", StringUtils.EMPTY);
-                    String s2 = StringUtils.replace(s1, "https://", StringUtils.EMPTY);
-                    while (StringUtils.isNotBlank(s2) && StringUtils.endsWith(s2, "/")) {
-                        s2 = StringUtils.substring(s2, 0, s2.length() - 1);
-                    }
-                    log.debug("service={}, server={}", name, s2);
-                    return s2;
-                })
-                .collectList()
-                .block();
+    return Mono.defer(() -> getEurekaClient().getNextServer(name))
+        .map(
+            s -> {
+              found.set(found.get() || servers.contains(s));
+              final boolean isFound = found.get();
+              if (!isFound) {
+                servers.add(s);
+                return s;
+              }
+              return StringUtils.EMPTY;
+            })
+        .onErrorResume(
+            throwable -> {
+              found.set(true);
+              return Mono.just(StringUtils.EMPTY);
+            })
+        .repeat(() -> !found.get())
+        .filter(s -> StringUtils.isNotBlank(s))
+        .map(
+            s -> {
+              final String s1 = StringUtils.replace(s, "http://", StringUtils.EMPTY);
+              String s2 = StringUtils.replace(s1, "https://", StringUtils.EMPTY);
+              while (StringUtils.isNotBlank(s2) && StringUtils.endsWith(s2, "/")) {
+                s2 = StringUtils.substring(s2, 0, s2.length() - 1);
+              }
+              log.debug("service={}, server={}", name, s2);
+              return s2;
+            })
+        .collectList()
+        .block();
     }
 }

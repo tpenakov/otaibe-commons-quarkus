@@ -1,16 +1,13 @@
 package org.otaibe.commons.quarkus.web.client;
 
 import io.vertx.mutiny.core.Vertx;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.otaibe.commons.quarkus.core.utils.ZipUtils;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j
