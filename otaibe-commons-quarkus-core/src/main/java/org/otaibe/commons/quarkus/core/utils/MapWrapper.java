@@ -1,7 +1,5 @@
 package org.otaibe.commons.quarkus.core.utils;
 
-import jakarta.annotation.PostConstruct;
-import jakarta.inject.Inject;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Optional;
@@ -21,10 +19,13 @@ import org.apache.commons.lang3.math.NumberUtils;
 @Slf4j
 public class MapWrapper {
 
-    @Inject
-    CastUtils castUtils;
+  private final CastUtils castUtils;
 
-    @PostConstruct
+  public MapWrapper(final CastUtils castUtils) {
+    this.castUtils = castUtils;
+    init();
+  }
+
     public void init() {
     }
 

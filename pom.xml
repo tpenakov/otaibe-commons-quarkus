@@ -52,6 +52,8 @@
         <mongodb.bson.version>4.10.2</mongodb.bson.version>
         <commons-validator.version>1.7</commons-validator.version>
         <joda-time.version>2.12.5</joda-time.version>
+        <lombok.version>1.18.30</lombok.version>
+        <slf4j.version>2.0.9</slf4j.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.parameters>true</maven.compiler.parameters>
@@ -154,11 +156,16 @@
                 <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
                 <version>${jboss-jaxrs-api_2.1_spec.version}</version>
             </dependency>
+            <dependency>
+                <groupId>jakarta.ws.rs</groupId>
+                <artifactId>jakarta.ws.rs-api</artifactId>
+                <version>3.1.0</version>
+            </dependency>
 
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
-                <version>2.0.9</version>
+                <version>${slf4j.version}</version>
             </dependency>
 
             <dependency>
@@ -213,7 +220,7 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
-                <version>1.18.30</version>
+                <version>${lombok.version}</version>
             </dependency>
 
             <dependency>

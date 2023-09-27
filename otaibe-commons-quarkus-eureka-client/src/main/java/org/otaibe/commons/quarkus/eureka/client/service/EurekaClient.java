@@ -6,8 +6,10 @@ import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
 import io.vertx.mutiny.ext.web.client.WebClient;
-import jakarta.annotation.PostConstruct;
-import jakarta.inject.Inject;
+import jakarta.ws.rs.core.HttpHeaders;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.UriBuilder;
 import java.net.Inet4Address;
 import java.net.URI;
 import java.net.UnknownHostException;
@@ -20,10 +22,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriBuilder;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -41,48 +39,57 @@ import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 import reactor.util.retry.Retry;
 
-/**
- * based on:
- * https://github.com/Netflix/eureka/wiki/Eureka-REST-operations
- */
-
+/** based on: https://github.com/Netflix/eureka/wiki/Eureka-REST-operations */
 @Getter
 @Setter
 @Slf4j
 public class EurekaClient {
 
-    @ConfigProperty(name = "quarkus.servlet.context-path")
-    Optional<String> contextPath;
-    @ConfigProperty(name = "quarkus.application.name")
-    String appName;
-    @ConfigProperty(name = "quarkus.http.port")
-    Integer port;
+  private final Optional<String> contextPath;
 
-    @Inject
-    EurekaSettings eurekaSettings;
+  private final String appName;
 
-    @Inject
-    Vertx vertx;
-    @Inject
-    JsonUtils jsonUtils;
-    @Inject
-    ObjectMapper objectMapper;
-    @Inject
-    MapWrapper mapWrapper;
+  private final Integer port;
 
-    WebClient client;
-    UriBuilder apiPath;
-    VertxImpl vertxDelegate;
+  private final EurekaSettings eurekaSettings;
 
-    InstanceInfo instanceInfo;
+  private final Vertx vertx;
+  private final JsonUtils jsonUtils;
+  private final ObjectMapper objectMapper;
+  private final MapWrapper mapWrapper;
 
-    Map<String, Tuple2<LocalDateTime, List<String>>> serversMap = new ConcurrentHashMap<>();
+  WebClient client;
+  UriBuilder apiPath;
+  VertxImpl vertxDelegate;
 
-    Duration period = Duration.ofSeconds(30);
+  InstanceInfo instanceInfo;
 
-    @PostConstruct
-    public void init() {
-        log.info("init started");
+  Map<String, Tuple2<LocalDateTime, List<String>>> serversMap = new ConcurrentHashMap<>();
+
+  Duration period = Duration.ofSeconds(30);
+
+  public EurekaClient(
+      @ConfigProperty(name = "quarkus.servlet.context-path") final Optional<String> contextPath,
+      @ConfigProperty(name = "quarkus.application.name") final String appName,
+      @ConfigProperty(name = "quarkus.http.port") final Integer port,
+      final EurekaSettings eurekaSettings,
+      final Vertx vertx,
+      final JsonUtils jsonUtils,
+      final ObjectMapper objectMapper,
+      final MapWrapper mapWrapper) {
+    this.contextPath = contextPath;
+    this.appName = appName;
+    this.port = port;
+    this.eurekaSettings = eurekaSettings;
+    this.vertx = vertx;
+    this.jsonUtils = jsonUtils;
+    this.objectMapper = objectMapper;
+    this.mapWrapper = mapWrapper;
+    init();
+  }
+
+  public void init() {
+    log.info("init started");
     final UriBuilder path =
         UriBuilder.fromUri(getEurekaSettings().getEurekaDefaultZone())
             .path(getEurekaSettings().getEurekaServerPath());
@@ -97,11 +104,11 @@ public class EurekaClient {
 
     apiPath = path;
 
-        vertxDelegate = (VertxImpl) getVertx().getDelegate();
+    vertxDelegate = (VertxImpl) getVertx().getDelegate();
 
-        initInstanceInfo();
+    initInstanceInfo();
 
-        if (getEurekaSettings().getRegisterEurekaClient()) {
+    if (getEurekaSettings().getRegisterEurekaClient()) {
       registerApp()
           .subscribeOn(
               Schedulers.fromExecutorService(getVertxDelegate().getWorkerPool().executor()))
@@ -112,26 +119,24 @@ public class EurekaClient {
                 return registerApp();
               })
           .subscribe();
-        }
     }
+  }
 
-    protected void fixServersMap() {
+  protected void fixServersMap() {
     final LocalDateTime threshold = LocalDateTime.now().minus(period);
-        getServersMap().entrySet()
-                .stream()
-                .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList())
-                .forEach(s -> getServersMap().remove(s))
-        ;
-    }
+    getServersMap().entrySet().stream()
+        .filter(entry -> threshold.isAfter(entry.getValue().getT1()))
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toList())
+        .forEach(s -> getServersMap().remove(s));
+  }
 
-    public Mono<Map<String, Object>> getAllApps() {
-        /**
-         * curl -v -H 'Accept: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps
-         */
-        return getApps(getApiPath().build().getPath());
-    }
+  public Mono<Map<String, Object>> getAllApps() {
+    /**
+     * curl -v -H 'Accept: application/json' http://eureka-at-staging.otaibe.org:9333/eureka/apps
+     */
+    return getApps(getApiPath().build().getPath());
+  }
 
   public Mono<String> getNextServer(final String serviceName) {
     /**
@@ -140,70 +145,78 @@ public class EurekaClient {
      */
     final String key = serviceName.toLowerCase();
 
-        boolean isRegistered = getEurekaSettings().getRegisterEurekaClient();
+    boolean isRegistered = getEurekaSettings().getRegisterEurekaClient();
 
-        if (!isRegistered) {
+    if (!isRegistered) {
       final String serviceShouldBeRegisteredKey =
           MessageFormat.format("eureka.app.{0}.register", key);
-            isRegistered = ConfigProvider.getConfig()
-                    .getOptionalValue(serviceShouldBeRegisteredKey, Boolean.class)
-                    .orElse(true);
-        }
+      isRegistered =
+          ConfigProvider.getConfig()
+              .getOptionalValue(serviceShouldBeRegisteredKey, Boolean.class)
+              .orElse(true);
+    }
 
-        if (!getEurekaSettings().getRegisterEurekaClient()) {
-            fixServersMap();
-        }
+    if (!getEurekaSettings().getRegisterEurekaClient()) {
+      fixServersMap();
+    }
 
-        if (!isRegistered) {
+    if (!isRegistered) {
       final String serviceUrlKey = MessageFormat.format("eureka.app.{0}.url", key);
-            return ConfigProvider.getConfig()
-                    .getOptionalValue(serviceUrlKey, String.class)
-                    .map(Mono::just)
-                    .orElseGet (() -> Mono.error(
-                            new RuntimeException("Missing configuration property " + serviceUrlKey)
-                    ));
-        }
+      return ConfigProvider.getConfig()
+          .getOptionalValue(serviceUrlKey, String.class)
+          .map(Mono::just)
+          .orElseGet(
+              () ->
+                  Mono.error(
+                      new RuntimeException("Missing configuration property " + serviceUrlKey)));
+    }
 
-        if (getServersMap().containsKey(key)) {
+    if (getServersMap().containsKey(key)) {
       final Tuple2<LocalDateTime, List<String>> objects = getServersMap().get(key);
       final List<String> t2 = objects.getT2();
-            if (!t2.isEmpty()) {
+      if (!t2.isEmpty()) {
 
-                if (t2.size() == 1) {
-                    return Mono.just(t2.get(0));
-                }
+        if (t2.size() == 1) {
+          return Mono.just(t2.get(0));
+        }
 
         final List<String> urls = new ArrayList<>(t2);
         final String result = urls.remove(0);
-                urls.add(result);
-                getServersMap().put(key, Tuples.of(objects.getT1(), urls));
-                return Mono.just(result);
-            }
-        }
-
-        return getApps(getPath(serviceName))
-                .map(map ->
-                        Optional.ofNullable(
-                                getMapWrapper().getValue(map, List.class, "application", "instance")))
-                .map(list -> list.orElseThrow(() -> new RuntimeException("unable to find instane of type " + key)))
-                .map(list -> list
-                        .stream()
-                        .filter(o -> StringUtils.equals(InstanceInfo.UP, getMapWrapper().getStringValue((Map) o, "status")))
-                        .map(o -> getMapWrapper().getStringValue((Map) o, "homePageUrl"))
-                        .collect(Collectors.toList())
-                )
-                .map(o -> (List) o)
-                .filter(list -> !list.isEmpty())
-                .flatMap(list -> {
-                    getServersMap().put(key, Tuples.of(LocalDateTime.now(), list));
-                    return getNextServer(serviceName);
-                })
-                .switchIfEmpty(Mono.error(new RuntimeException("unable to find instane of type " + key)))
-                ;
-
+        urls.add(result);
+        getServersMap().put(key, Tuples.of(objects.getT1(), urls));
+        return Mono.just(result);
+      }
     }
 
-    public Mono<Boolean> registerApp() {
+    return getApps(getPath(serviceName))
+        .map(
+            map ->
+                Optional.ofNullable(
+                    getMapWrapper().getValue(map, List.class, "application", "instance")))
+        .map(
+            list ->
+                list.orElseThrow(
+                    () -> new RuntimeException("unable to find instane of type " + key)))
+        .map(
+            list ->
+                list.stream()
+                    .filter(
+                        o ->
+                            StringUtils.equals(
+                                InstanceInfo.UP, getMapWrapper().getStringValue((Map) o, "status")))
+                    .map(o -> getMapWrapper().getStringValue((Map) o, "homePageUrl"))
+                    .collect(Collectors.toList()))
+        .map(o -> (List) o)
+        .filter(list -> !list.isEmpty())
+        .flatMap(
+            list -> {
+              getServersMap().put(key, Tuples.of(LocalDateTime.now(), list));
+              return getNextServer(serviceName);
+            })
+        .switchIfEmpty(Mono.error(new RuntimeException("unable to find instane of type " + key)));
+  }
+
+  public Mono<Boolean> registerApp() {
 
     final String rqString = instanceInfo.toXmlString();
 
@@ -241,7 +254,7 @@ public class EurekaClient {
         .doOnError(throwable -> log.trace("unable to registerApp", throwable))
         .retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(15)))
         .doOnError(throwable -> log.error("unable to registerApp", throwable));
-    }
+  }
 
   private Mono<Map<String, Object>> getApps(final String path) {
     return Mono.fromCompletionStage(
@@ -262,30 +275,30 @@ public class EurekaClient {
         .doOnError(
             throwable ->
                 log.error(MessageFormat.format("unable to get apps for {0}", path), throwable));
-    }
+  }
 
-    private void initInstanceInfo() {
-        String hostName = StringUtils.EMPTY;
-        String hostAddress = StringUtils.EMPTY;
-        try {
-            hostName = Inet4Address.getLocalHost().getHostName();
-            hostAddress = Inet4Address.getLocalHost().getHostAddress();
+  private void initInstanceInfo() {
+    String hostName = StringUtils.EMPTY;
+    String hostAddress = StringUtils.EMPTY;
+    try {
+      hostName = Inet4Address.getLocalHost().getHostName();
+      hostAddress = Inet4Address.getLocalHost().getHostAddress();
     } catch (final UnknownHostException e) {
-            log.error("unknown host", e);
-        }
-
-        instanceInfo = InstanceInfo.builder()
-                .localHostName(hostName)
-                .app(getAppName())
-                .port(getPort())
-                .eurekaHostName(getEurekaSettings().getHostNameForEureka())
-                .contextPath(getContextPath().orElse(StringUtils.EMPTY))
-                .ipAddress(hostAddress)
-                .build();
+      log.error("unknown host", e);
     }
+
+    instanceInfo =
+        InstanceInfo.builder()
+            .localHostName(hostName)
+            .app(getAppName())
+            .port(getPort())
+            .eurekaHostName(getEurekaSettings().getHostNameForEureka())
+            .contextPath(getContextPath().orElse(StringUtils.EMPTY))
+            .ipAddress(hostAddress)
+            .build();
+  }
 
   private String getPath(final String subPath) {
-        return getApiPath().clone().path(subPath).build().getPath();
-    }
-
+    return getApiPath().clone().path(subPath).build().getPath();
+  }
 }
