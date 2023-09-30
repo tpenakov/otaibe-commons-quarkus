@@ -26,6 +26,7 @@
         <module>re-read-http-request-body</module>
         <module>keycloak-extension</module>
         <module>otaibe-commons-quarkus-keycloack-users</module>
+        <module>otaibe-commons-quarkus-aws-rest-lambda-client</module>
     </modules>
 
     <name>otaibe-commons-quarkus</name>
@@ -232,6 +233,12 @@
                 <groupId>org.graalvm.sdk</groupId>
                 <artifactId>graal-sdk</artifactId>
                 <version>${graal-vm.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>io.vavr</groupId>
+                <artifactId>vavr</artifactId>
+                <version>0.10.3</version>
             </dependency>
 
         </dependencies>
