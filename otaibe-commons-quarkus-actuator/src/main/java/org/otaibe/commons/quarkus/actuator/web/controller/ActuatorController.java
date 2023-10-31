@@ -3,6 +3,17 @@ package org.otaibe.commons.quarkus.actuator.web.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
+import jakarta.inject.Inject;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -12,18 +23,6 @@ import org.otaibe.commons.quarkus.actuator.web.domain.Info;
 import org.otaibe.commons.quarkus.actuator.web.domain.Metrics;
 import org.otaibe.commons.quarkus.core.utils.JsonUtils;
 import reactor.core.publisher.Mono;
-
-import javax.inject.Inject;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 @Path(StringUtils.EMPTY)
 @Getter
@@ -48,7 +47,7 @@ public class ActuatorController {
     @Path(INFO)
     @Produces(MediaType.APPLICATION_JSON)
     public CompletionStage<Response> info() {
-        CompletableFuture<Response> result = new CompletableFuture<>();
+        final CompletableFuture<Response> result = new CompletableFuture<>();
 
         return Optional.ofNullable(info)
                 .map(info1 -> {
@@ -57,19 +56,19 @@ public class ActuatorController {
                 })
                 .orElseGet(() -> {
                     info = new Info();
-                    Mono.from(getVertx().fileSystem()
+                    Mono.fromCompletionStage(getVertx().fileSystem()
                             .readFile(GIT_PROPERTIES)
                             .map(Buffer::toString)
                             .convert()
-                            .toPublisher()
+                            .toCompletionStage()
                     )
                             .doOnSuccess(s -> log.info("git props: {}", s))
                             .map(s -> getJsonUtils().readValue(s, Map.class, getObjectMapper()))
                             .map(map -> map.orElse(new HashMap()))
                             .map(map -> {
-                                GitInfo gitInfo = new GitInfo();
+                                final GitInfo gitInfo = new GitInfo();
                                 gitInfo.setBranch((String) map.get(GitInfo.GIT_BRANCH));
-                                GitInfo.CommitInfo commit = new GitInfo.CommitInfo();
+                                final GitInfo.CommitInfo commit = new GitInfo.CommitInfo();
                                 gitInfo.setCommit(commit);
                                 commit.setId((String) map.get(GitInfo.GIT_COMMIT_ID));
                                 commit.setTime((String) map.get(GitInfo.GIT_COMMIT_TIME));
@@ -90,8 +89,8 @@ public class ActuatorController {
     @Path(METRICS)
     @Produces(MediaType.APPLICATION_JSON)
     public String metrics() {
-        Metrics result = new Metrics();
-        Runtime runtime = Runtime.getRuntime();
+        final Metrics result = new Metrics();
+        final Runtime runtime = Runtime.getRuntime();
         result.setMemory(runtime.totalMemory());
         result.setMemoryFree(runtime.freeMemory());
 

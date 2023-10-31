@@ -1,5 +1,12 @@
 package org.otaibe.commons.quarkus.elasticsearch.client.dao;
 
+import jakarta.inject.Inject;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import javax.ws.rs.HttpMethod;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -37,15 +44,7 @@ import org.otaibe.commons.quarkus.elasticsearch.client.utils.EsMetadataUtils;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.util.context.Context;
-
-import javax.inject.Inject;
-import javax.ws.rs.HttpMethod;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.function.BiFunction;
-import java.util.function.Function;
+import reactor.util.context.ContextView;
 
 @Getter
 @Setter
@@ -102,105 +101,117 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         ;
     }
 
-    public Mono<Boolean> deleteById(T data) {
-        return Mono.just(getId(data))
-                .filter(s -> StringUtils.isNotBlank(s))
-                .flatMap(s -> Flux
-                        .<Boolean>create(fluxSink -> {
-                            DeleteRequest request = new DeleteRequest(getTableName(), s);
-                            request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
-                            getRestClient().deleteAsync(request, RequestOptions.DEFAULT, new ActionListener<DeleteResponse>() {
-                                @Override
-                                public void onResponse(DeleteResponse deleteResponse) {
-                                    log.debug("delete result: {}", deleteResponse);
-                                    fluxSink.next(StringUtils.equalsAnyIgnoreCase(DELETED, deleteResponse.getResult().getLowercase()));
-                                    fluxSink.complete();
-                                }
+  public Mono<Boolean> deleteById(final T data) {
+    return Mono.just(getId(data))
+        .filter(s -> StringUtils.isNotBlank(s))
+        .flatMap(
+            s ->
+                Flux.<Boolean>create(
+                        fluxSink -> {
+                          final DeleteRequest request = new DeleteRequest(getTableName(), s);
+                          request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
+                          getRestClient()
+                              .deleteAsync(
+                                  request,
+                                  RequestOptions.DEFAULT,
+                                  new ActionListener<DeleteResponse>() {
+                                    @Override
+                                    public void onResponse(final DeleteResponse deleteResponse) {
+                                      log.debug("delete result: {}", deleteResponse);
+                                      fluxSink.next(
+                                          StringUtils.equalsAnyIgnoreCase(
+                                              DELETED, deleteResponse.getResult().getLowercase()));
+                                      fluxSink.complete();
+                                    }
 
-                                @Override
-                                public void onFailure(Exception e) {
-                                    log.error("unable to delete", e);
-                                    fluxSink.error(new RuntimeException(e));
-                                }
-                            });
+                                    @Override
+                                    public void onFailure(final Exception e) {
+                                      log.error("unable to delete", e);
+                                      fluxSink.error(new RuntimeException(e));
+                                    }
+                                  });
                         })
-                        .next()
-                )
-                .defaultIfEmpty(false)
-                ;
+                    .next())
+        .defaultIfEmpty(false);
     }
 
-    public Mono<T> findById(T pkData) {
-        return Mono.just(getId(pkData))
-                .filter(s -> StringUtils.isNotBlank(s))
-                .flatMap(s -> Flux
-                        .<T>create(fluxSink -> {
-                            GetRequest request = new GetRequest(getTableName(), s);
-                            getRestClient().getAsync(request, RequestOptions.DEFAULT, new ActionListener<GetResponse>() {
-                                @Override
-                                public void onResponse(GetResponse response) {
-                                    log.debug("get result: {}", response);
-                                    if (response.isSourceEmpty()) {
+  public Mono<T> findById(final T pkData) {
+    return Mono.just(getId(pkData))
+        .filter(s -> StringUtils.isNotBlank(s))
+        .flatMap(
+            s ->
+                Flux.<T>create(
+                        fluxSink -> {
+                          final GetRequest request = new GetRequest(getTableName(), s);
+                          getRestClient()
+                              .getAsync(
+                                  request,
+                                  RequestOptions.DEFAULT,
+                                  new ActionListener<GetResponse>() {
+                                    @Override
+                                    public void onResponse(final GetResponse response) {
+                                      log.debug("get result: {}", response);
+                                      if (response.isSourceEmpty()) {
                                         fluxSink.complete();
                                         return;
+                                      }
+                                      final Map<String, Object> map = response.getSourceAsMap();
+                                      final T result =
+                                          getJsonUtils().fromMap(map, getEntityClass());
+                                      fluxSink.next(result);
+                                      fluxSink.complete();
                                     }
-                                    Map<String, Object> map = response.getSourceAsMap();
-                                    T result = getJsonUtils().fromMap(map, getEntityClass());
-                                    fluxSink.next(result);
-                                    fluxSink.complete();
-                                }
 
-                                @Override
-                                public void onFailure(Exception e) {
-                                    log.error("unable to get", e);
-                                    fluxSink.error(new RuntimeException(e));
-                                }
-                            });
+                                    @Override
+                                    public void onFailure(final Exception e) {
+                                      log.error("unable to get", e);
+                                      fluxSink.error(new RuntimeException(e));
+                                    }
+                                  });
                         })
-                        .next()
-                )
-                ;
+                    .next());
     }
 
-    protected Flux<T> findByMatch(Map<String, Object> map) {
-        BoolQueryBuilder query = QueryBuilders.boolQuery();
+  protected Flux<T> findByMatch(final Map<String, Object> map) {
+    final BoolQueryBuilder query = QueryBuilders.boolQuery();
         return findBy(map, query,
                 queryBuilder -> query.should(queryBuilder),
                 (s, o) -> getSearchSourceBuilderByMatch(s, o));
     }
 
-    protected Flux<T> findByMatch(String fieldName, Object value) {
-        SearchRequest searchRequest = getSearchRequestByMatch(fieldName, value);
+  protected Flux<T> findByMatch(final String fieldName, final Object value) {
+    final SearchRequest searchRequest = getSearchRequestByMatch(fieldName, value);
         return search(searchRequest);
     }
 
-    protected SearchRequest getSearchRequestByMatch(String fieldName, Object value) {
-        SearchRequest searchRequest = new SearchRequest(getTableName());
-        SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByMatch(fieldName, value);
+  protected SearchRequest getSearchRequestByMatch(final String fieldName, final Object value) {
+    final SearchRequest searchRequest = new SearchRequest(getTableName());
+    final SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByMatch(fieldName, value);
         searchRequest.source(searchSourceBuilder);
         return searchRequest;
     }
 
-    protected SearchSourceBuilder getSearchSourceBuilderByMatch(String fieldName, Object value) {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+  protected SearchSourceBuilder getSearchSourceBuilderByMatch(
+      final String fieldName, final Object value) {
+    final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.matchQuery(fieldName, value));
         return searchSourceBuilder;
     }
 
-    protected Flux<T> findByExactMatch(Map<String, Object> map) {
-        BoolQueryBuilder query = QueryBuilders.boolQuery();
+  protected Flux<T> findByExactMatch(final Map<String, Object> map) {
+    final BoolQueryBuilder query = QueryBuilders.boolQuery();
         return findBy(map, query,
                 queryBuilder -> query.must(queryBuilder),
                 (s, o) -> getSearchSourceBuilderByExactMatch(s, o));
     }
 
-    protected Flux<T> findBy(Map<String, Object> map,
-                             BoolQueryBuilder query,
-                             Function<QueryBuilder, BoolQueryBuilder> fn,
-                             BiFunction<String, Object, SearchSourceBuilder> fn1
-    ) {
-        SearchRequest searchRequest = new SearchRequest(getTableName());
-        SearchSourceBuilder searchSourceBuilder1 = new SearchSourceBuilder();
+  protected Flux<T> findBy(
+      final Map<String, Object> map,
+      final BoolQueryBuilder query,
+      final Function<QueryBuilder, BoolQueryBuilder> fn,
+      final BiFunction<String, Object, SearchSourceBuilder> fn1) {
+    final SearchRequest searchRequest = new SearchRequest(getTableName());
+    final SearchSourceBuilder searchSourceBuilder1 = new SearchSourceBuilder();
         searchSourceBuilder1.query(query);
         searchRequest.source(searchSourceBuilder1);
         map.entrySet().stream()
@@ -212,329 +223,375 @@ public abstract class AbstractElasticsearchReactiveDaoImplementation<T> {
         return search(searchRequest);
     }
 
-    protected Flux<T> findByExactMatch(String fieldName, Object value) {
-        SearchRequest searchRequest = getSearchRequestByExactMatch(fieldName, value);
+  protected Flux<T> findByExactMatch(final String fieldName, final Object value) {
+    final SearchRequest searchRequest = getSearchRequestByExactMatch(fieldName, value);
         return search(searchRequest);
     }
 
-    protected SearchRequest getSearchRequestByExactMatch(String fieldName, Object value) {
-        SearchRequest searchRequest = new SearchRequest(getTableName());
-        SearchSourceBuilder searchSourceBuilder = getSearchSourceBuilderByExactMatch(fieldName, value);
+  protected SearchRequest getSearchRequestByExactMatch(final String fieldName, final Object value) {
+    final SearchRequest searchRequest = new SearchRequest(getTableName());
+    final SearchSourceBuilder searchSourceBuilder =
+        getSearchSourceBuilderByExactMatch(fieldName, value);
         searchRequest.source(searchSourceBuilder);
         return searchRequest;
     }
 
-    protected SearchSourceBuilder getSearchSourceBuilderByExactMatch(String fieldName, Object value) {
-        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+  protected SearchSourceBuilder getSearchSourceBuilderByExactMatch(
+      final String fieldName, final Object value) {
+    final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
         searchSourceBuilder.query(QueryBuilders.termQuery(fieldName, value));
         return searchSourceBuilder;
     }
 
-    protected Flux<T> search(SearchRequest searchRequest) {
-        return Mono.subscriberContext()
-                .map(context -> {
-                    SearchSourceBuilder builder = searchRequest.source();
-                    getEsMetadataUtils().extract(context).ifPresent(esMetadata -> {
-                        Optional.ofNullable(esMetadata.getQuery()).ifPresent(query -> {
-                            Optional.ofNullable(query.getFrom())
-                                    .ifPresent(integer -> builder.from(integer));
-                            Optional.ofNullable(query.getSize())
-                                    .ifPresent(integer -> builder.size(integer));
-                            Optional.ofNullable(query.getSort())
-                                    .ifPresent(map -> map
-                                            .entrySet()
-                                            .forEach(entry -> builder.sort(entry.getKey(), entry.getValue())));
-                            Optional.ofNullable(query.getAskForScrollId())
-                                    .filter(Boolean::booleanValue)
-                                    .ifPresent(aBoolean -> {
-                                        searchRequest.scroll(SCROLL_KEEP_ALIVE);
-                                    });
-                        });
-                    });
-                    return context;
-                })
-                .flatMapMany(context ->
-                        Flux.create(fluxSink -> getRestClient().searchAsync(
+  protected Flux<T> search(final SearchRequest searchRequest) {
+    return Mono.deferContextual(
+            context -> {
+              final SearchSourceBuilder builder = searchRequest.source();
+              getEsMetadataUtils()
+                  .extract(context)
+                  .ifPresent(
+                      esMetadata -> {
+                        Optional.ofNullable(esMetadata.getQuery())
+                            .ifPresent(
+                                query -> {
+                                  Optional.ofNullable(query.getFrom())
+                                      .ifPresent(integer -> builder.from(integer));
+                                  Optional.ofNullable(query.getSize())
+                                      .ifPresent(integer -> builder.size(integer));
+                                  Optional.ofNullable(query.getSort())
+                                      .ifPresent(
+                                          map ->
+                                              map.entrySet()
+                                                  .forEach(
+                                                      entry ->
+                                                          builder.sort(
+                                                              entry.getKey(), entry.getValue())));
+                                  Optional.ofNullable(query.getAskForScrollId())
+                                      .filter(Boolean::booleanValue)
+                                      .ifPresent(
+                                          aBoolean -> searchRequest.scroll(SCROLL_KEEP_ALIVE));
+                                });
+                      });
+              return Mono.just(context);
+            })
+        .flatMapMany(
+            context ->
+                Flux.create(
+                    fluxSink ->
+                        getRestClient()
+                            .searchAsync(
                                 searchRequest,
                                 RequestOptions.DEFAULT,
-                                searchResponseAction(context, fluxSink))
-                        )
-                );
+                                searchResponseAction(context, fluxSink))));
     }
 
-    public Flux<T> search(SearchScrollRequest searchRequest) {
+  public Flux<T> search(final SearchScrollRequest searchRequest) {
         searchRequest.scroll(SCROLL_KEEP_ALIVE);
-        return Mono.subscriberContext()
-                .flatMapMany(context ->
-                        Flux.<T>create(fluxSink -> getRestClient().scrollAsync(
+    return Flux.deferContextual(
+            context ->
+                Flux.<T>create(
+                    fluxSink ->
+                        getRestClient()
+                            .scrollAsync(
                                 searchRequest,
                                 RequestOptions.DEFAULT,
-                                searchResponseAction(context, (FluxSink<T>) fluxSink))
-                        )
-                )
-                .doOnTerminate(() -> clearScroll(searchRequest.scrollId()))
-                ;
+                                searchResponseAction(context, (FluxSink<T>) fluxSink))))
+        .doOnTerminate(() -> clearScroll(searchRequest.scrollId()));
     }
 
-    protected ActionListener<SearchResponse> searchResponseAction(Context context, FluxSink<T> fluxSink) {
-        return new ActionListener<SearchResponse>() {
-            @Override
-            public void onResponse(SearchResponse searchResponse) {
-                SearchHits hits = searchResponse.getHits();
-                getEsMetadataUtils().extract(context).ifPresent(metadata1 -> {
-                    EsMetadata.EsDaoMetadata metadata = new EsMetadata.EsDaoMetadata();
-                    getEsMetadataUtils().ensureDaoMap(metadata1).put(getTableName(), metadata);
+  protected ActionListener<SearchResponse> searchResponseAction(
+      final ContextView context, final FluxSink<T> fluxSink) {
+    return new ActionListener<SearchResponse>() {
+      @Override
+      public void onResponse(final SearchResponse searchResponse) {
+        final SearchHits hits = searchResponse.getHits();
+        getEsMetadataUtils()
+            .extract(context)
+            .ifPresent(
+                metadata1 -> {
+                  final EsMetadata.EsDaoMetadata metadata = new EsMetadata.EsDaoMetadata();
+                  getEsMetadataUtils().ensureDaoMap(metadata1).put(getTableName(), metadata);
 
-                    String scrollId = searchResponse.getScrollId();
-                    boolean haveScrollId = StringUtils.isNotBlank(scrollId);
-                    if (haveScrollId && hits.getHits().length == 0) {
-                        clearScroll(scrollId);
-                        metadata.setScrollId(null);
-                    } else {
-                        metadata.setScrollId(haveScrollId ? scrollId : null);
-                    }
+                  final String scrollId = searchResponse.getScrollId();
+                  final boolean haveScrollId = StringUtils.isNotBlank(scrollId);
+                  if (haveScrollId && hits.getHits().length == 0) {
+                    clearScroll(scrollId);
+                    metadata.setScrollId(null);
+                  } else {
+                    metadata.setScrollId(haveScrollId ? scrollId : null);
+                  }
 
-                    Optional.ofNullable(hits.getTotalHits())
-                            .map(totalHits -> totalHits.value)
-                            .ifPresent(aLong -> metadata.setTotalResults(aLong));
+                  Optional.ofNullable(hits.getTotalHits())
+                      .map(totalHits -> totalHits.value)
+                      .ifPresent(aLong -> metadata.setTotalResults(aLong));
                 });
-                Arrays.stream(hits.getHits()).forEach(fields -> {
-                    Map<String, Object> map = fields.getSourceAsMap();
-                    T t = getJsonUtils().fromMap(map, getEntityClass());
-                    fluxSink.next(t);
+        Arrays.stream(hits.getHits())
+            .forEach(
+                fields -> {
+                  final Map<String, Object> map = fields.getSourceAsMap();
+                  final T t = getJsonUtils().fromMap(map, getEntityClass());
+                  fluxSink.next(t);
                 });
-                fluxSink.complete();
-            }
+        fluxSink.complete();
+      }
 
-            @Override
-            public void onFailure(Exception e) {
-                log.error("search failed", e);
-                fluxSink.error(new RuntimeException(e));
-            }
-        };
+      @Override
+      public void onFailure(final Exception e) {
+        log.error("search failed", e);
+        fluxSink.error(new RuntimeException(e));
+      }
+    };
     }
 
-    protected void clearScroll(String scrollId) {
-        ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
+  protected void clearScroll(final String scrollId) {
+    final ClearScrollRequest clearScrollRequest = new ClearScrollRequest();
         clearScrollRequest.addScrollId(scrollId);
-        getRestClient().clearScrollAsync(clearScrollRequest, RequestOptions.DEFAULT, new ActionListener<ClearScrollResponse>() {
-            @Override
-            public void onResponse(ClearScrollResponse clearScrollResponse) {
+    getRestClient()
+        .clearScrollAsync(
+            clearScrollRequest,
+            RequestOptions.DEFAULT,
+            new ActionListener<ClearScrollResponse>() {
+              @Override
+              public void onResponse(final ClearScrollResponse clearScrollResponse) {
                 log.debug("clearScrollResponse.isSucceeded={}", clearScrollResponse.isSucceeded());
-            }
+              }
 
-            @Override
-            public void onFailure(Exception e) {
+              @Override
+              public void onFailure(final Exception e) {
                 log.error("unable to clear scroll response", e);
-            }
+              }
+            });
+    }
+
+  public Mono<T> save(final T t) {
+
+    return Mono.deferContextual(
+        context -> {
+          if (StringUtils.isBlank(getId(t))) {
+            setId(t, UUID.randomUUID().toString());
+          }
+
+          final IndexRequest request = new IndexRequest(getTableName());
+          request.id(getId(t));
+          request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
+
+          final Optional<Boolean> isCreateOnly =
+              getEsMetadataUtils()
+                  .extract(context)
+                  .map(EsMetadata::getQuery)
+                  .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
+          isCreateOnly.ifPresent(aBoolean -> request.create(aBoolean));
+          if (!isCreateOnly.orElse(false)) {
+            final Long versionNum =
+                Optional.ofNullable(getVersion(t)).map(aLong -> aLong + 1).orElse(0l);
+            request.version(versionNum);
+            request.versionType(VersionType.EXTERNAL);
+            setVersion(t, versionNum);
+          }
+
+          return Mono.just(getJsonUtils().toStringLazy(t).toString())
+              .flatMapMany(
+                  s ->
+                      Flux.<T>create(
+                          fluxSink -> {
+                            request.source(s, XContentType.JSON);
+                            getRestClient()
+                                .indexAsync(
+                                    request,
+                                    RequestOptions.DEFAULT,
+                                    new ActionListener<IndexResponse>() {
+                                      @Override
+                                      public void onResponse(final IndexResponse response) {
+                                        log.debug("save result: {}", response);
+                                        fluxSink.next(t);
+                                        fluxSink.complete();
+                                      }
+
+                                      @Override
+                                      public void onFailure(final Exception e) {
+                                        log.error("unable to save", e);
+                                        fluxSink.error(new RuntimeException(e));
+                                      }
+                                    });
+                          }))
+              .next();
         });
     }
 
-    public Mono<T> save(T t) {
-
-        return Mono.subscriberContext()
-                .flatMap(context -> {
-                    if (StringUtils.isBlank(getId(t))) {
-                        setId(t, UUID.randomUUID().toString());
-                    }
-
-                    IndexRequest request = new IndexRequest(getTableName());
-                    request.id(getId(t));
-                    request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
-
-                    Optional<Boolean> isCreateOnly = getEsMetadataUtils().extract(context)
-                            .map(EsMetadata::getQuery)
-                            .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
-                    isCreateOnly.ifPresent(aBoolean -> request.create(aBoolean));
-                    if (!isCreateOnly.orElse(false)) {
-                        Long versionNum = Optional.ofNullable(getVersion(t))
-                                .map(aLong -> aLong + 1)
-                                .orElse(0l);
-                        request.version(versionNum);
-                        request.versionType(VersionType.EXTERNAL);
-                        setVersion(t, versionNum);
-                    }
-
-                    return Mono.just(getJsonUtils().toStringLazy(t).toString())
-                            .flatMapMany(s -> Flux.<T>create(fluxSink -> {
-                                        request.source(s, XContentType.JSON);
-                                        getRestClient().indexAsync(
-                                                request,
-                                                RequestOptions.DEFAULT,
-                                                new ActionListener<IndexResponse>() {
-                                                    @Override
-                                                    public void onResponse(IndexResponse response) {
-                                                        log.debug("save result: {}", response);
-                                                        fluxSink.next(t);
-                                                        fluxSink.complete();
-                                                    }
-
-                                                    @Override
-                                                    public void onFailure(Exception e) {
-                                                        log.error("unable to save", e);
-                                                        fluxSink.error(new RuntimeException(e));
-                                                    }
-                                                });
-                                    })
-                            )
-                            .next();
-                });
-    }
-
-    public Mono<T> update(T data) {
+  public Mono<T> update(final T data) {
 
         if (data == null) {
             return Mono.empty();
         }
 
-        String id = getId(data);
+    final String id = getId(data);
 
         if (StringUtils.isBlank(id)) {
             return Mono.error(new RuntimeException("id is blank"));
         }
 
-        UpdateRequest request = new UpdateRequest(getTableName(), id);
+    final UpdateRequest request = new UpdateRequest(getTableName(), id);
         request.doc(getJsonUtils().toStringLazy(data).toString(), XContentType.JSON);
         request.setRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
         request.retryOnConflict(5);
         request.fetchSource(true);
 
-        return Mono.subscriberContext()
-                .flatMap(context ->
-                    Flux.<T>create(fluxSink -> {
-                        getRestClient().updateAsync(request, RequestOptions.DEFAULT, new ActionListener<UpdateResponse>() {
-                            @Override
-                            public void onResponse(UpdateResponse response) {
-                                GetResult result = response.getGetResult();
-                                if (result.isExists() && !result.isSourceEmpty()) {
-                                    String sourceAsString = result.sourceAsString();
-                                    getJsonUtils().readValue(sourceAsString, getEntityClass())
-                                            .ifPresent(t -> {
-                                                setVersion(t, response.getVersion());
-                                                fluxSink.next(t);
+    return Mono.deferContextual(
+        context ->
+            Flux.<T>create(
+                    fluxSink -> {
+                      getRestClient()
+                          .updateAsync(
+                              request,
+                              RequestOptions.DEFAULT,
+                              new ActionListener<UpdateResponse>() {
+                                @Override
+                                public void onResponse(final UpdateResponse response) {
+                                  final GetResult result = response.getGetResult();
+                                  if (result.isExists() && !result.isSourceEmpty()) {
+                                    final String sourceAsString = result.sourceAsString();
+                                    getJsonUtils()
+                                        .readValue(sourceAsString, getEntityClass())
+                                        .ifPresent(
+                                            t -> {
+                                              setVersion(t, response.getVersion());
+                                              fluxSink.next(t);
                                             });
+                                  }
+                                  fluxSink.complete();
                                 }
-                                fluxSink.complete();
-                            }
 
-                            @Override
-                            public void onFailure(Exception e) {
-                                log.error("unable to update", e);
-                                fluxSink.error(new RuntimeException(e));
-                            }
-                        });
-                    })
-                            .next()
-                            .flatMap(t -> {
-                                Optional<Boolean> isCreateOnly = getEsMetadataUtils().extract(context)
-                                        .map(EsMetadata::getQuery)
-                                        .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
-                                if (!isCreateOnly.orElse(false)) {
-                                    return save(t);//ugly hack in order to update version number in db
+                                @Override
+                                public void onFailure(final Exception e) {
+                                  log.error("unable to update", e);
+                                  fluxSink.error(new RuntimeException(e));
                                 }
-                                return Mono.just(t);
-                            })
-                )
-                ;
+                              });
+                    })
+                .next()
+                .flatMap(
+                    t -> {
+                      final Optional<Boolean> isCreateOnly =
+                          getEsMetadataUtils()
+                              .extract(context)
+                              .map(EsMetadata::getQuery)
+                              .map(EsMetadata.EsQueryMetadata::getIsOpTypeCreate);
+                      if (!isCreateOnly.orElse(false)) {
+                        return save(t); // ugly hack in order to update version number in db
+                      }
+                      return Mono.just(t);
+                    }));
     }
 
     protected Map<String, Object> getKeywordTextAnalizer() {
         return getTextAnalizer(KEYWORD);
     }
 
-    protected Map<String, Object> getTextAnalizer(String analyzer) {
-        Map<String, Object> result = new HashMap<>();
+  protected Map<String, Object> getTextAnalizer(final String analyzer) {
+    final Map<String, Object> result = new HashMap<>();
         result.put(TYPE, TEXT);
         result.put(ANALYZER, analyzer);
         return result;
     }
 
     protected Map<String, Object> getDateFieldType() {
-        Map<String, Object> result = new HashMap<>();
+    final Map<String, Object> result = new HashMap<>();
         result.put(TYPE, DATE);
         result.put(FORMAT, "strict_date_time||epoch_second||epoch_millis");
         return result;
     }
 
     protected Map<String, Object> getLongFieldType() {
-        Map<String, Object> result = new HashMap<>();
+    final Map<String, Object> result = new HashMap<>();
         result.put(TYPE, LONG);
         return result;
     }
 
     protected Map<String, Object> getBooleanFieldType() {
-        Map<String, Object> result = new HashMap<>();
+    final Map<String, Object> result = new HashMap<>();
         result.put(TYPE, BOOLEAN);
         return result;
     }
 
     protected Mono<Boolean> createIndex() {
-        CreateIndexRequest request = new CreateIndexRequest(getTableName());
+    final CreateIndexRequest request = new CreateIndexRequest(getTableName());
 
         return createIndex(request);
     }
 
-    protected Mono<Boolean> createIndex(Map<String, Object> propsMapping) {
-        CreateIndexRequest request = new CreateIndexRequest(getTableName());
-        Map<String, Object> mapping = new HashMap();
+  protected Mono<Boolean> createIndex(final Map<String, Object> propsMapping) {
+    final CreateIndexRequest request = new CreateIndexRequest(getTableName());
+    final Map<String, Object> mapping = new HashMap();
         mapping.put(PROPERTIES, propsMapping);
         request.mapping(mapping);
         return createIndex(request);
     }
 
-    protected Mono<Boolean> createIndex(CreateIndexRequest request) {
-        return Flux.<Boolean>create(fluxSink -> getRestClient().indices().createAsync(request, RequestOptions.DEFAULT, new ActionListener<CreateIndexResponse>() {
-            @Override
-            public void onResponse(CreateIndexResponse createIndexResponse) {
-                log.info("CreateIndexResponse: {}", createIndexResponse);
-                fluxSink.next(createIndexResponse.isAcknowledged());
-                fluxSink.complete();
-            }
+  protected Mono<Boolean> createIndex(final CreateIndexRequest request) {
+    return Flux.<Boolean>create(
+            fluxSink ->
+                getRestClient()
+                    .indices()
+                    .createAsync(
+                        request,
+                        RequestOptions.DEFAULT,
+                        new ActionListener<CreateIndexResponse>() {
+                          @Override
+                          public void onResponse(final CreateIndexResponse createIndexResponse) {
+                            log.info("CreateIndexResponse: {}", createIndexResponse);
+                            fluxSink.next(createIndexResponse.isAcknowledged());
+                            fluxSink.complete();
+                          }
 
-            @Override
-            public void onFailure(Exception e) {
-                log.error("unable to create index", e);
-                fluxSink.error(new RuntimeException(e));
-            }
-        }))
-                .next();
+                          @Override
+                          public void onFailure(final Exception e) {
+                            log.error("unable to create index", e);
+                            fluxSink.error(new RuntimeException(e));
+                          }
+                        }))
+        .next();
     }
 
     protected Mono<Boolean> ensureIndex() {
-        return Mono.just(false)
-                .flatMap(atomicBoolean -> Flux
-                        .<Boolean>create(fluxSink -> getRestClient().getLowLevelClient()
+    return Mono.just(false)
+        .flatMap(
+            atomicBoolean ->
+                Flux.<Boolean>create(
+                        fluxSink ->
+                            getRestClient()
+                                .getLowLevelClient()
                                 .performRequestAsync(
-                                        new Request(HttpMethod.HEAD, getTableName()), new ResponseListener() {
-                                            @Override
-                                            public void onSuccess(Response response) {
-                                                logResponse(response);
-                                                boolean result =
-                                                        response.getStatusLine().getStatusCode() == HttpStatus.SC_OK;
-                                                fluxSink.next(result);
-                                                fluxSink.complete();
-                                            }
+                                    new Request(HttpMethod.HEAD, getTableName()),
+                                    new ResponseListener() {
+                                      @Override
+                                      public void onSuccess(final Response response) {
+                                        logResponse(response);
+                                        final boolean result =
+                                            response.getStatusLine().getStatusCode()
+                                                == HttpStatus.SC_OK;
+                                        fluxSink.next(result);
+                                        fluxSink.complete();
+                                      }
 
-                                            @Override
-                                            public void onFailure(Exception exception) {
-                                                log.error("unable to check for index", exception);
-                                                fluxSink.error(new RuntimeException(exception));
-                                            }
-                                        }))
-                        .next()
-                );
+                                      @Override
+                                      public void onFailure(final Exception exception) {
+                                        log.error("unable to check for index", exception);
+                                        fluxSink.error(new RuntimeException(exception));
+                                      }
+                                    }))
+                    .next());
     }
 
-    private void logResponse(Response response) {
-        HttpEntity entity = response.getEntity();
+  private void logResponse(final Response response) {
+    final HttpEntity entity = response.getEntity();
         if (entity == null) {
             log.debug("entity is null");
             return;
         }
         try {
-            InputStream content = entity.getContent();
+      final InputStream content = entity.getContent();
             log.debug("response result: {}", IOUtils.toString(content, StandardCharsets.UTF_8));
-        } catch (Exception e) {
+    } catch (final Exception e) {
             log.error("unable to log response", e);
         }
     }

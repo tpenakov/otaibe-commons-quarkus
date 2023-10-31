@@ -16,16 +16,29 @@ class AwsExtensionProcessor {
         return new FeatureBuildItem(FEATURE);
     }
 
-    @BuildStep
-    public void registerReflection(BuildProducer<ReflectiveClassBuildItem> resource) {
-        resource.produce(new ReflectiveClassBuildItem(true, true, ExecutionInterceptor.class));
+  @BuildStep
+  public void registerReflection(final BuildProducer<ReflectiveClassBuildItem> resource) {
+    resource.produce(
+        ReflectiveClassBuildItem.builder(ExecutionInterceptor.class)
+            .constructors(true)
+            .methods(true)
+            .fields(true)
+            .build());
 
-        ReflectUtils.getAllClassesFromPackage(
-                software.amazon.awssdk.services.s3.internal.handlers.AddContentMd5HeaderInterceptor.class.getPackage().getName(),
-                Object.class)
-                .forEach(aClass -> resource
-                        .produce(new ReflectiveClassBuildItem(true, true, aClass)));
-        ;
+    ReflectUtils.getAllClassesFromPackage(
+            software.amazon.awssdk.services.s3.internal.handlers.AsyncChecksumValidationInterceptor
+                .class
+                .getPackage()
+                .getName(),
+            Object.class)
+        .forEach(
+            aClass ->
+                resource.produce(
+                    ReflectiveClassBuildItem.builder(ExecutionInterceptor.class)
+                        .constructors(true)
+                        .methods(true)
+                        .fields(true)
+                        .build()));
     }
 
 }

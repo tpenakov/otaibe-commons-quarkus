@@ -5,6 +5,16 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.core.buffer.Buffer;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.text.MessageFormat;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -14,18 +24,6 @@ import org.otaibe.commons.quarkus.core.utils.MapWrapper;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.function.Tuples;
-
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import java.text.MessageFormat;
-import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
-
 
 @Getter
 @Setter
@@ -61,43 +59,47 @@ public abstract class ConfigService {
                 .configure(SerializationFeature.INDENT_OUTPUT, true)
         ;
 
-        Flux.fromIterable(getConfigFiles())
-                .flatMap(s -> readYmlMap(s)
-                        .doOnNext(map -> log.info("file {} was loaded", s))
-                        .map(map -> Tuples.of(s, map))
-                )
-                .collectMap(objects -> objects.getT1(), objects -> objects.getT2())
-                .map(map -> getConfigFiles().stream()
-                        .map(s -> map.get(s))
-                        .collect(Collectors.toList())
-                )
-                //.doOnNext(maps -> log.info("yml config list: {}", getJsonUtils().toStringLazy(maps, getObjectMapper())))
-                .map(maps -> maps
-                        .stream()
-                        .reduce(allSettings, (map, map2) -> {
-                            try {
-                                return getMapWrapper().mergeStringObjectMap(map, map2);
-                            } catch (Exception e) {
-                                log.error("unable to merge maps", e);
-                                log.error("map: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
-                                log.error("map2: {}", getJsonUtils().toStringLazy(map2, getObjectMapper()));
-                                throw new RuntimeException(e);
-                            }
-                        })
-                )
-                .map(map -> {
-                    //log.info("yml config: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
-                    readAllSettings(map);
-                    setAllSettings(map);
-                    return true;
-                })
-                .retry(10)
-                .map(aBoolean -> {
-                    getIsInitialized().set(true);
-                    return true;
-                })
-                .subscribe();
-
+    Flux.fromIterable(getConfigFiles())
+        .flatMap(
+            s ->
+                readYmlMap(s)
+                    .doOnNext(map -> log.info("file {} was loaded", s))
+                    .map(map -> Tuples.of(s, map)))
+        .collectMap(objects -> objects.getT1(), objects -> objects.getT2())
+        .map(map -> getConfigFiles().stream().map(s -> map.get(s)).collect(Collectors.toList()))
+        // .doOnNext(maps -> log.info("yml config list: {}", getJsonUtils().toStringLazy(maps,
+        // getObjectMapper())))
+        .map(
+            maps ->
+                maps.stream()
+                    .reduce(
+                        allSettings,
+                        (map, map2) -> {
+                          try {
+                            return getMapWrapper().mergeStringObjectMap(map, map2);
+                          } catch (final Exception e) {
+                            log.error("unable to merge maps", e);
+                            log.error(
+                                "map: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
+                            log.error(
+                                "map2: {}", getJsonUtils().toStringLazy(map2, getObjectMapper()));
+                            throw new RuntimeException(e);
+                          }
+                        }))
+        .map(
+            map -> {
+              // log.info("yml config: {}", getJsonUtils().toStringLazy(map, getObjectMapper()));
+              readAllSettings(map);
+              setAllSettings(map);
+              return true;
+            })
+        .retry(10)
+        .map(
+            aBoolean -> {
+              getIsInitialized().set(true);
+              return true;
+            })
+        .subscribe();
     }
 
     public Mono<Boolean> isInitialized() {
@@ -115,7 +117,8 @@ public abstract class ConfigService {
 
     protected abstract void readAllSettings(Map<String, Object> allSettings1);
 
-    protected  <T> T getSettings(Map<String, Object> allSettings1, Class<T> clazz, String... path) {
+  protected <T> T getSettings(
+      final Map<String, Object> allSettings1, final Class<T> clazz, final String... path) {
         return Optional.ofNullable(getMapWrapper().getObjectValue(allSettings1, path))
                 .map(o -> getJsonUtils().toStringLazy(o, getObjectMapper()).toString())
                 .flatMap(s -> getJsonUtils().readValue(s, clazz, getObjectMapper()))
@@ -124,22 +127,21 @@ public abstract class ConfigService {
                                 path, clazz.getName())));
     }
 
-    public Mono<Map<String, Object>> readYmlMap(String path) {
-        return Mono.from(
-                getVertx().fileSystem().readFile(path)
-                .convert().toPublisher()
-        )
-                .map(Buffer::getBytes)
-                //.doOnNext(bytes -> log.info("fileName: {}", path))
-                //.doOnNext(bytes -> log.info("file: {}", new String(bytes)))
-                .map(bytes -> {
-                    try {
-                        return getYamlMapper().readValue(bytes, Map.class);
-                    } catch (Exception e) {
-                        log.error("unable to read from file:" + path, e);
-                        throw new RuntimeException(e);
-                    }
-                });
+  public Mono<Map<String, Object>> readYmlMap(final String path) {
+    return Mono.fromCompletionStage(
+            getVertx().fileSystem().readFile(path).convert().toCompletionStage())
+        .map(Buffer::getBytes)
+        // .doOnNext(bytes -> log.info("fileName: {}", path))
+        // .doOnNext(bytes -> log.info("file: {}", new String(bytes)))
+        .map(
+            bytes -> {
+              try {
+                return getYamlMapper().readValue(bytes, Map.class);
+              } catch (final Exception e) {
+                log.error("unable to read from file:" + path, e);
+                throw new RuntimeException(e);
+              }
+            });
     }
 
 }

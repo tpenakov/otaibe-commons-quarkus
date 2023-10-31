@@ -1,73 +1,71 @@
 package org.otaibe.commons.quarkus.core.utils;
 
+import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import java.math.BigDecimal;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 /**
  * Created by triphon on 14-10-11.
  */
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j
 public class MapWrapper {
 
-    @Inject
-    CastUtils castUtils;
+  private final CastUtils castUtils;
 
-    @PostConstruct
+  public MapWrapper(final CastUtils castUtils) {
+    this.castUtils = castUtils;
+    init();
+  }
+
     public void init() {
     }
 
-    public String getStringValue(Map node, String... path) {
+    public String getStringValue(final Map node, final String... path) {
         return getValue(node, String.class, path);
     }
 
-    public Integer getIntegerValue(Map node, String... path) {
-        Integer result = getValue(node, Integer.class, path);
+    public Integer getIntegerValue(final Map node, final String... path) {
+        final Integer result = getValue(node, Integer.class, path);
         if (result != null) {
             return result;
         }
         return NumberUtils.createInteger(getStringValue(node, path));
     }
 
-    public BigDecimal getBigDecimalValue(Map node, String... path) {
-        BigDecimal result = getValue(node, BigDecimal.class, path);
+    public BigDecimal getBigDecimalValue(final Map node, final String... path) {
+        final BigDecimal result = getValue(node, BigDecimal.class, path);
         if (result != null) {
             return result;
         }
         return NumberUtils.createBigDecimal(getStringValue(node, path));
     }
 
-    public Boolean getBooleanValue(Map node, String... path) {
-        Boolean result = getValue(node, Boolean.class, path);
+    public Boolean getBooleanValue(final Map node, final String... path) {
+        final Boolean result = getValue(node, Boolean.class, path);
         if (result != null) {
             return result;
         }
-        String stringValue = getStringValue(node, path);
+        final String stringValue = getStringValue(node, path);
         return Boolean.valueOf(stringValue);
     }
 
-    public Object getObjectValue(Map node, String... path) {
+    public Object getObjectValue(final Map node, final String... path) {
         return getValue(node, Object.class, path);
     }
 
-    public <T> T getValue(Map node, Class<T> clazz, String... path) {
+    public <T> T getValue(final Map node, final Class<T> clazz, final String... path) {
         Optional nodeOptional = Optional.ofNullable(node);
         if (ArrayUtils.isNotEmpty(path)) {
-            for (String key : path) {
+            for (final String key : path) {
                 nodeOptional = nodeOptional.map(o -> ((Map) o).get(key));
             }
         }
@@ -81,7 +79,7 @@ public class MapWrapper {
      * @param map2
      * @return a new merged map where if duplicate key exists the map2 will override the value of map1
      */
-    public Map<String, Object> mergeStringObjectMap(Map<String, Object> map1, Map<String, Object> map2) {
+    public Map<String, Object> mergeStringObjectMap(final Map<String, Object> map1, final Map<String, Object> map2) {
         return Stream.of(map1, map2)
                 .flatMap(map -> map.entrySet().stream())
                 .filter(entry -> null != entry.getKey() && null != entry.getValue())

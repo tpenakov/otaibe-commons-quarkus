@@ -1,6 +1,14 @@
 package org.otaibe.commons.quarkus.aws.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -21,20 +29,9 @@ import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
-import javax.annotation.PostConstruct;
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
-import java.util.Optional;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 /**
  * https://docs.aws.amazon.com/sdk-for-java/v2/developer-guide/welcome.html
  */
-@ApplicationScoped
 @Getter
 @Setter
 @Slf4j
@@ -79,13 +76,13 @@ public class StorageProcessor {
 
         s3AsyncClient = createS3AsyncClientBuilder().build();
 
-        String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
+        final String strip = StringUtils.replace(getAwsBucket1(), "s3://", StringUtils.EMPTY);
         awsBucket = StringUtils.substring(strip, 0, StringUtils.length(strip) - 1);
         log.info("initialized ensureWrite={}", getEnsureWrite());
     }
 
     protected S3AsyncClientBuilder createS3AsyncClientBuilder() throws Exception {
-        S3AsyncClientBuilder s3AsyncClientBuilder = S3AsyncClient.builder()
+        final S3AsyncClientBuilder s3AsyncClientBuilder = S3AsyncClient.builder()
                 .httpClientBuilder(NettyNioAsyncHttpClient.builder()
                         .maxConcurrency(100)
                         .maxPendingConnectionAcquires(10_000)
@@ -99,7 +96,7 @@ public class StorageProcessor {
         return s3AsyncClientBuilder;
     }
 
-    public <T> Mono<T> readObject(String key, Class<T> tClass) {
+    public <T> Mono<T> readObject(final String key, final Class<T> tClass) {
         return readBytes(key)
                 .doOnSubscribe(subscription -> log.trace("readObject {} {}", key, tClass.getSimpleName()))
                 .map(s -> getJsonUtils().readValue(s, tClass, getObjectMapper()))
@@ -112,12 +109,12 @@ public class StorageProcessor {
                 .map(t -> t.get());
     }
 
-    public <T> Mono<Object> writeObject(String key, T object) {
+    public <T> Mono<Object> writeObject(final String key, final T object) {
         return write(key, getJsonUtils().toStringLazy(object, getObjectMapper()).toString());
     }
 
-    public Mono<Object> write(String key, String text) {
-        AtomicBoolean isWritten = new AtomicBoolean(false);
+    public Mono<Object> write(final String key, final String text) {
+        final AtomicBoolean isWritten = new AtomicBoolean(false);
         return Flux.<PutObjectResponse>create(fluxSink ->
                 getS3AsyncClient().putObject(
                         builder -> builder.key(key).bucket(getAwsBucket()),
@@ -142,8 +139,8 @@ public class StorageProcessor {
                 .doOnError(throwable -> log.error("unable to write text with key: " + key, throwable));
     }
 
-    public Mono<Object> write(String key, byte[] data) {
-        AtomicBoolean isWritten = new AtomicBoolean(false);
+    public Mono<Object> write(final String key, final byte[] data) {
+        final AtomicBoolean isWritten = new AtomicBoolean(false);
         return Flux.<PutObjectResponse>create(fluxSink ->
                 getS3AsyncClient().putObject(
                         builder -> builder.key(key).bucket(getAwsBucket()),
@@ -168,7 +165,7 @@ public class StorageProcessor {
                 .doOnError(throwable -> log.error("unable to write bytes with key: " + key, throwable));
     }
 
-    public Mono<String> read(String key) {
+    public Mono<String> read(final String key) {
         return readBytes(key)
                 .map(bytes ->
                         software.amazon.awssdk.utils.StringUtils.fromBytes(
@@ -176,7 +173,7 @@ public class StorageProcessor {
                 .filter(s -> StringUtils.isNotBlank(s));
     }
 
-    public Mono<byte[]> readBytes(String key) {
+    public Mono<byte[]> readBytes(final String key) {
         return Flux.<byte[]>create(fluxSink ->
                 getS3AsyncClient().getObject(
                         builder -> builder.key(key).bucket(getAwsBucket()),
@@ -203,7 +200,7 @@ public class StorageProcessor {
                                 return;
                             }
                             if (CompletionException.class.isAssignableFrom(throwable.getClass())) {
-                                Class<? extends Throwable> causeException = ((CompletionException) throwable).getCause().getClass();
+                                final Class<? extends Throwable> causeException = ((CompletionException) throwable).getCause().getClass();
                                 if (NoSuchKeyException.class.isAssignableFrom(causeException)) {
                                     fluxSink.complete();
                                     return;
@@ -219,14 +216,14 @@ public class StorageProcessor {
                 ;
     }
 
-    public Mono<String> readETag(String key) {
+    public Mono<String> readETag(final String key) {
         return Flux.<String>create(fluxSink ->
                 getS3AsyncClient().headObject(
                         builder -> builder.key(key).bucket(getAwsBucket())
                 )
                         .whenComplete((headObjectResponse, throwable) -> {
                             if (headObjectResponse != null) {
-                                String etag = headObjectResponse.eTag();
+                                final String etag = headObjectResponse.eTag();
                                 if (StringUtils.isNotBlank(etag)) {
                                     fluxSink.next(etag);
                                 }
@@ -234,7 +231,7 @@ public class StorageProcessor {
                                 return;
                             }
                             if (CompletionException.class.isAssignableFrom(throwable.getClass())) {
-                                Class<? extends Throwable> causeException = ((CompletionException) throwable).getCause().getClass();
+                                final Class<? extends Throwable> causeException = ((CompletionException) throwable).getCause().getClass();
                                 if (NoSuchKeyException.class.isAssignableFrom(causeException)) {
                                     fluxSink.complete();
                                     return;
@@ -251,11 +248,11 @@ public class StorageProcessor {
 
     }
 
-    Mono<Boolean> ensureWriteMono(String key, AtomicBoolean isWritten, String etag) {
+    Mono<Boolean> ensureWriteMono(final String key, final AtomicBoolean isWritten, final String etag) {
         return readETag(key)
                 .defaultIfEmpty(StringUtils.EMPTY)
                 .flatMap(s -> {
-                    boolean result = StringUtils.equals(etag, s);
+                    final boolean result = StringUtils.equals(etag, s);
                     isWritten.set(result);
                     return result ?
                             Mono.just(result) : Flux.interval(Duration.ofMillis(50)).next().map(aLong -> result);

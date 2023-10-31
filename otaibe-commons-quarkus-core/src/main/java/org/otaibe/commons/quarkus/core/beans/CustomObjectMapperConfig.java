@@ -5,9 +5,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
-import javax.enterprise.context.ApplicationScoped;
-
-@ApplicationScoped
 public class CustomObjectMapperConfig {
 
     /*
@@ -22,7 +19,7 @@ public class CustomObjectMapperConfig {
     }
      */
 
-    public void fillObjectMapper(ObjectMapper objectMapper1) {
+    public void fillObjectMapper(final ObjectMapper objectMapper1) {
 
         // perform configuration
         objectMapper1

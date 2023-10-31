@@ -1,12 +1,10 @@
 package org.otaibe.commons.quarkus.core.utils;
 
-import javax.enterprise.context.ApplicationScoped;
 import java.util.Optional;
 
 /**
  * Created by triphon on 07.07.16.
  */
-@ApplicationScoped
 public class CastUtils {
 
     public <T> T as(Class<T> t, Object o) {

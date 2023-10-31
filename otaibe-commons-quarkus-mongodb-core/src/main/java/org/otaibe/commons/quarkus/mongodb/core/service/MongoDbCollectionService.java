@@ -4,6 +4,13 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.reactivestreams.client.FindPublisher;
 import com.mongodb.reactivestreams.client.MongoCollection;
+import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.BsonDocument;
@@ -16,14 +23,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
-
-import javax.inject.Inject;
-import javax.validation.Valid;
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Getter
 @Slf4j
@@ -40,28 +39,28 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
 
     }
 
-    public MongoDbCollectionService(MongoDbDatabaseService service,
-                                    String collectionName,
-                                    Class<T> mainClass,
-                                    Class... clasesArray) {
+    public MongoDbCollectionService(final MongoDbDatabaseService service,
+                                    final String collectionName,
+                                    final Class<T> mainClass,
+                                    final Class... clasesArray) {
         this.mainClass = mainClass;
-        this.pojoCodecRegistry = BsonUtils.createPojoCodecRegistry(mainClass, clasesArray);
+        pojoCodecRegistry = BsonUtils.createPojoCodecRegistry(mainClass, clasesArray);
         collection = service.getDatabase()
                 .getCollection(collectionName, mainClass)
-                .withCodecRegistry(this.pojoCodecRegistry)
+                .withCodecRegistry(pojoCodecRegistry)
         ;
     }
 
 
-    public BsonDocument toBsonDocument(T template, Class<T> clazz) {
+    public BsonDocument toBsonDocument(final T template, final Class<T> clazz) {
         return getBsonUtils().toBsonDocument(template, clazz, getPojoCodecRegistry());
     }
 
-    public T fromMap(Map<String, Object> map, Class<T> clazz) {
+    public T fromMap(final Map<String, Object> map, final Class<T> clazz) {
         return getBsonUtils().fromMap(map, clazz, getPojoCodecRegistry());
     }
 
-    public Mono<T> findByIdPretty(String idPretty) {
+    public Mono<T> findByIdPretty(final String idPretty) {
         return Mono.from(getCollection().find(Filters.eq(IdEntity.ID, new ObjectId(idPretty))));
     }
 
@@ -71,7 +70,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
      * @param template - will search for formOptInBRs containing all not null fields
      * @return
      */
-    public Flux<T> findByAllNotNullFields(T template, Integer skip, Integer size) {
+    public Flux<T> findByAllNotNullFields(final T template, final Integer skip, final Integer size) {
         return findByAllNotNullFields(template, skip, size, null);
     }
 
@@ -81,12 +80,12 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
      * @param template - will search for formOptInBRs containing all not null fields
      * @return
      */
-    public Flux<T> findByAllNotNullFields(T template, Integer skip, Integer size, Bson sort) {
+    public Flux<T> findByAllNotNullFields(final T template, final Integer skip, final Integer size, final Bson sort) {
 
-        Class<T> clazz = (Class<T>) template.getClass();
-        BsonDocument bsonDocument = toBsonDocument(template, clazz);
+        final Class<T> clazz = (Class<T>) template.getClass();
+        final BsonDocument bsonDocument = toBsonDocument(template, clazz);
 
-        FindPublisher<T> find = getCollection()
+        final FindPublisher<T> find = getCollection()
                 .find(bsonDocument, clazz)
                 .skip(skip)
                 .limit(size);
@@ -100,7 +99,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 .doOnError(throwable -> log.error("byAllNotNullFields error", throwable));
     }
 
-    public Mono<T> save(@Valid T entity) {
+    public Mono<T> save(@Valid final T entity) {
         return Optional.ofNullable(entity.getId())
                 .map(objectId -> Mono.from(
                         getCollection().findOneAndReplace(
@@ -121,9 +120,9 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 ;
     }
 
-    public Flux<T> bulkSave(@Valid List<T> entities) {
+    public Flux<T> bulkSave(@Valid final List<T> entities) {
 
-        List<WriteModel<T>> writes = entities.stream()
+        final List<WriteModel<T>> writes = entities.stream()
                 .map(t -> {
                     if (null == t.getId()) {
                         t.setId(ObjectId.get());
@@ -146,9 +145,9 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 ;
     }
 
-    public Mono<Long> bulkDelete(List<T> entities) {
-        List<ObjectId> idList = entities.stream().map(t -> t.getId()).collect(Collectors.toList());
-        Publisher<DeleteResult> deleteMany = getCollection().deleteMany(
+    public Mono<Long> bulkDelete(final List<T> entities) {
+        final List<ObjectId> idList = entities.stream().map(t -> t.getId()).collect(Collectors.toList());
+        final Publisher<DeleteResult> deleteMany = getCollection().deleteMany(
                 Filters.in(IdEntity.ID, idList)
         );
         return Mono.from(deleteMany)
@@ -157,7 +156,7 @@ public abstract class MongoDbCollectionService<T extends IdEntity> {
                 ;
     }
 
-    public Mono<Boolean> deleteByIdPretty(String id) {
+    public Mono<Boolean> deleteByIdPretty(final String id) {
         return Mono.from(getCollection().deleteOne(Filters.eq(IdEntity.ID, new ObjectId(id))))
                 .doOnNext(deleteResult -> log.debug("for id={} deleted {} entities", id, deleteResult.getDeletedCount()))
                 .map(deleteResult -> true);

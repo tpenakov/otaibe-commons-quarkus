@@ -3,7 +3,7 @@
     <parent>
         <artifactId>otaibe-commons-quarkus</artifactId>
         <groupId>org.otaibe.commons.quarkus</groupId>
-        <version>01.09.24-SNAPSHOT</version>
+        <version>03.04.10-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -43,8 +43,8 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
         <dependency>
-            <groupId>commons-collections</groupId>
-            <artifactId>commons-collections</artifactId>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-collections4</artifactId>
         </dependency>
 
         <dependency>

@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.otaibe.commons.quarkus</groupId>
         <artifactId>otaibe-commons-quarkus-aws-extension-parent</artifactId>
-        <version>01.09.24-SNAPSHOT</version>
+        <version>03.04.10-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
@@ -34,23 +34,9 @@
         <plugins>
             <plugin>
                 <groupId>io.quarkus</groupId>
-                <artifactId>quarkus-bootstrap-maven-plugin</artifactId>
-                <version>${quarkus.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>extension-descriptor</goal>
-                        </goals>
-                        <phase>compile</phase>
-                        <configuration>
-                            <deployment>${project.groupId}:${project.artifactId}-deployment:${project.version}
-                            </deployment>
-                        </configuration>
-                    </execution>
-                </executions>
+                <artifactId>quarkus-extension-maven-plugin</artifactId>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <annotationProcessorPaths>

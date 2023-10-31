@@ -4,9 +4,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-import javax.enterprise.context.ApplicationScoped;
-
-@ApplicationScoped
 @Getter
 @Setter
 public class UserServiceSettings {

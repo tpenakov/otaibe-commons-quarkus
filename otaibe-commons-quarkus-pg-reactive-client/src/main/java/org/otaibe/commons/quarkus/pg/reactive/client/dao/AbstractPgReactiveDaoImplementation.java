@@ -2,8 +2,15 @@ package org.otaibe.commons.quarkus.pg.reactive.client.dao;
 
 import io.vertx.mutiny.pgclient.PgPool;
 import io.vertx.mutiny.sqlclient.Row;
-import io.vertx.mutiny.sqlclient.Transaction;
+import io.vertx.mutiny.sqlclient.SqlConnection;
 import io.vertx.mutiny.sqlclient.Tuple;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import java.text.MessageFormat;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -17,242 +24,235 @@ import reactor.core.publisher.Mono;
 import reactor.util.function.Tuple2;
 import reactor.util.function.Tuples;
 
-import javax.annotation.PostConstruct;
-import javax.inject.Inject;
-import java.text.MessageFormat;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
-
 @Getter
 @Setter
 @Slf4j
 public abstract class AbstractPgReactiveDaoImplementation<T, ID> {
-    public static final char COMMA = ',';
-    public static final String SINGLE_QUOTE = "'";
-    public static final String SELECT_FROM = "SELECT {0} FROM {1}";
-    public static final String INSERT_INTO = "INSERT INTO {0} ({1}) VALUES ({2})";
-    public static final String DELETE_FROM_WHERE = "DELETE FROM {0} WHERE ";
-    public static final String DELETE_FROM = DELETE_FROM_WHERE + "{1}=$1";
-    public static final String FIND_BY_ID = "{0} WHERE {1}=$1";
+  public static final char COMMA = ',';
+  public static final String SINGLE_QUOTE = "'";
+  public static final String SELECT_FROM = "SELECT {0} FROM {1}";
+  public static final String INSERT_INTO = "INSERT INTO {0} ({1}) VALUES ({2})";
+  public static final String DELETE_FROM_WHERE = "DELETE FROM {0} WHERE ";
+  public static final String DELETE_FROM = DELETE_FROM_WHERE + "{1}=$1";
+  public static final String FIND_BY_ID = "{0} WHERE {1}=$1";
 
-    @Inject
-    PgPool client;
-    @Inject
-    JsonConfig jsonConfig;
-    @Inject
-    JsonUtils jsonUtils;
+  @Inject PgPool client;
+  @Inject JsonConfig jsonConfig;
+  @Inject JsonUtils jsonUtils;
 
-    private String allColumnsHeader;
-    private String selectFromSql;
-    private String deleteByIdSql;
-    private String findByIdSql;
-    private AtomicBoolean isInited = new AtomicBoolean(false);
+  private String allColumnsHeader;
+  private String selectFromSql;
+  private String deleteByIdSql;
+  private String findByIdSql;
+  private AtomicBoolean isInited = new AtomicBoolean(false);
 
-    protected abstract String getIdFieldName();
+  protected abstract String getIdFieldName();
 
-    protected abstract ID getId(T entity);
+  protected abstract ID getId(T entity);
 
-    protected abstract String getTableName();
+  protected abstract String getTableName();
 
-    protected abstract T createDummyEntityWithAllFields();
+  protected abstract T createDummyEntityWithAllFields();
 
-    protected abstract T fromRow(Row row);
+  protected abstract T fromRow(Row row);
 
-    protected abstract void fixDataMap(T data, Map<String, Object> entity);
+  protected abstract void fixDataMap(T data, Map<String, Object> entity);
 
-    @PostConstruct
-    public void init() {
-        log.info("init started");
-        T dummyEntityWithAllFields = createDummyEntityWithAllFields();
-        //log.info("init dummyEntityWithAllFields={}", dummyEntityWithAllFields);
-        Map<String, Object> entity = getJsonUtils().toMap(
-                dummyEntityWithAllFields,
-                getJsonConfig().getDbPropsNamesMapper());
-        //log.info("init entity={}", entity);
-        allColumnsHeader = StringUtils.join(entity.keySet(), COMMA);
-        fillSelectFromSql();
-        fillDeleteByIdTemplate();
-        fillFindByIdTemplate();
-        getIsInited().set(true);
-        log.info("init completed");
-    }
+  @PostConstruct
+  public void init() {
+    log.info("init started");
+    final T dummyEntityWithAllFields = createDummyEntityWithAllFields();
+    // log.info("init dummyEntityWithAllFields={}", dummyEntityWithAllFields);
+    final Map<String, Object> entity =
+        getJsonUtils().toMap(dummyEntityWithAllFields, getJsonConfig().getDbPropsNamesMapper());
+    // log.info("init entity={}", entity);
+    allColumnsHeader = StringUtils.join(entity.keySet(), COMMA);
+    fillSelectFromSql();
+    fillDeleteByIdTemplate();
+    fillFindByIdTemplate();
+    getIsInited().set(true);
+    log.info("init completed");
+  }
 
-    public Mono<Boolean> deleteById(T data) {
-        //String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
-        return Mono.from(getClient()
+  public Mono<Boolean> deleteById(final T data) {
+    // String sql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
+    return Mono.fromCompletionStage(
+            getClient()
                 .preparedQuery(getDeleteByIdSql())
                 .execute(getIdTuple(data))
                 .convert()
-                .toPublisher()
-        )
-                .doOnNext(rows -> log.trace("delete data: {}", rows))
-                .map(rows -> rows.rowCount() == 1);
+                .toCompletionStage())
+        .doOnNext(rows -> log.trace("delete data: {}", rows))
+        .map(rows -> rows.rowCount() == 1);
+  }
 
-    }
-
-    public Mono<T> findById(T pkData) {
-        return Mono.from(getClient()
+  public Mono<T> findById(final T pkData) {
+    return Mono.fromCompletionStage(
+            getClient()
                 .preparedQuery(getFindByIdSql())
                 .execute(getIdTuple(pkData))
                 .convert()
-                .toPublisher()
-        )
-                .flatMapMany(rows -> Flux.fromIterable(rows))
-                .next()
-                .map(row -> fromRow(row))
-                ;
-    }
+                .toCompletionStage())
+        .flatMapMany(rows -> Flux.fromIterable(rows))
+        .next()
+        .map(row -> fromRow(row));
+  }
 
-    public Mono<T> save(T data) {
+  public Mono<T> save(final T data) {
 
-        Tuple2<String, Tuple> objects1 = prepareForInsert(data);
+    final Tuple2<String, Tuple> objects1 = prepareForInsert(data);
 
-        return Mono.from(getClient().begin().convert().toPublisher())
-                .flatMap(pgTransaction -> Mono.from(pgTransaction
-                                .preparedQuery(getDeleteByIdSql())
-                                .execute(getIdTuple(data))
-                                .convert()
-                                .toPublisher()
-                        )
-                                .zipWhen(rows -> Mono.from(pgTransaction
-                                        .preparedQuery(objects1.getT1())
-                                        .execute(objects1.getT2())
-                                        .convert()
-                                        .toPublisher()
-                                ))
-                                .zipWhen(objects -> Mono.from(pgTransaction.commit().convert().toPublisher())
-                                        .then(Mono.just(true))
-                                )
-                )
-                .doOnNext(rows -> log.trace("save data: {}", rows))
-                .map(rows -> data);
-    }
+    return Mono.fromCompletionStage(
+        getClient()
+            .withTransaction(
+                sqlConnection ->
+                    sqlConnection
+                        .preparedQuery(getDeleteByIdSql())
+                        .execute(getIdTuple(data))
+                        .flatMap(
+                            rows ->
+                                sqlConnection
+                                    .preparedQuery(objects1.getT1())
+                                    .execute(objects1.getT2())
+                                    .onItem()
+                                    .transform(rows1 -> Tuples.of(rows, rows1)))
+                        .onItem()
+                        .invoke(rows -> log.trace("save data: {}", rows))
+                        .replaceWith(data))
+            .convert()
+            .toCompletionStage());
+  }
 
-    protected Mono<T> save(Transaction transaction, T data) {
-        Tuple2<String, Tuple> objects = prepareForInsert(data);
+  protected Mono<T> save(final SqlConnection transaction, final T data) {
+    final Tuple2<String, Tuple> objects = prepareForInsert(data);
 
-        return Mono.from(transaction.preparedQuery(objects.getT1())
+    return Mono.fromCompletionStage(
+            transaction
+                .preparedQuery(objects.getT1())
                 .execute(objects.getT2())
                 .convert()
-                .toPublisher()
-        )
-                .map(rows -> data);
+                .toCompletionStage())
+        .map(rows -> data);
+  }
+
+  public Mono<Boolean> batchSave(final List<T> dataList) {
+    if (CollectionUtils.isEmpty(dataList)) {
+      return Mono.just(true);
     }
 
+    final List<Tuple2<Tuple2<String, Tuple>, Tuple2<String, Tuple>>> batchData =
+        dataList.stream()
+            .map(
+                containersStats ->
+                    Tuples.of(
+                        prepareForInsert(containersStats),
+                        Tuples.of(getDeleteByIdSql(), getIdTuple(containersStats))))
+            .collect(Collectors.toList());
 
-    public Mono<Boolean> batchSave(List<T> dataList) {
-        if (CollectionUtils.isEmpty(dataList)) {
-            return Mono.just(true);
-        }
-
-        List<Tuple2<Tuple2<String, Tuple>, Tuple2<String, Tuple>>> batchData = dataList.stream()
-                .map(containersStats ->
-                        Tuples.of(
-                                prepareForInsert(containersStats),
-                                Tuples.of(getDeleteByIdSql(), getIdTuple(containersStats))
-                        )
-                )
-                .collect(Collectors.toList());
-
-        Tuple2<String, List<Tuple>> deleteData = batchData.stream()
-                .map(objects -> Tuples.of(objects.getT2().getT1(), Arrays.asList(objects.getT2().getT2())))
-                .reduce((objects, objects2) -> {
-                    List<Tuple> list = new ArrayList(objects.getT2());
-                    list.addAll(objects2.getT2());
-                    return Tuples.of(objects.getT1(), list);
+    final Tuple2<String, List<Tuple>> deleteData =
+        batchData.stream()
+            .map(
+                objects ->
+                    Tuples.of(objects.getT2().getT1(), Arrays.asList(objects.getT2().getT2())))
+            .reduce(
+                (objects, objects2) -> {
+                  final List<Tuple> list = new ArrayList(objects.getT2());
+                  list.addAll(objects2.getT2());
+                  return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create delete data batch"));
+            .orElseThrow(() -> new RuntimeException("unable to create delete data batch"));
 
-        Tuple2<String, List<Tuple>> insertData = batchData.stream()
-                .map(objects -> Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
-                .reduce((objects, objects2) -> {
-                    List<Tuple> list = new ArrayList(objects.getT2());
-                    list.addAll(objects2.getT2());
-                    return Tuples.of(objects.getT1(), list);
+    final Tuple2<String, List<Tuple>> insertData =
+        batchData.stream()
+            .map(
+                objects ->
+                    Tuples.of(objects.getT1().getT1(), Arrays.asList(objects.getT1().getT2())))
+            .reduce(
+                (objects, objects2) -> {
+                  final List<Tuple> list = new ArrayList(objects.getT2());
+                  list.addAll(objects2.getT2());
+                  return Tuples.of(objects.getT1(), list);
                 })
-                .orElseThrow(() -> new RuntimeException("unable to create insert data batch"));
+            .orElseThrow(() -> new RuntimeException("unable to create insert data batch"));
 
-        return Mono.from(getClient().begin().convert().toPublisher())
-                .flatMap(pgTransaction -> Mono.from(pgTransaction
-                                .preparedQuery(deleteData.getT1())
-                                .executeBatch(deleteData.getT2())
-                                .convert()
-                                .toPublisher()
-                        )
-                                .zipWhen(rows -> Mono.from(pgTransaction
-                                        .preparedQuery(insertData.getT1())
-                                        .executeBatch(insertData.getT2())
-                                        .convert()
-                                        .toPublisher()
-                                ))
-                                .zipWhen(objects -> Mono.from(pgTransaction.commit().convert().toPublisher())
-                                        .then(Mono.just(true))
-                                )
-                )
-                .doOnNext(rows -> log.trace("save data: {}", rows))
-                .map(rows -> rows.getT2());
+    return Mono.fromCompletionStage(
+        getClient()
+            .withTransaction(
+                sqlConnection ->
+                    sqlConnection
+                        .preparedQuery(deleteData.getT1())
+                        .executeBatch(deleteData.getT2())
+                        .flatMap(
+                            rows ->
+                                sqlConnection
+                                    .preparedQuery(insertData.getT1())
+                                    .executeBatch(insertData.getT2())
+                                    .onItem()
+                                    .transform(rows1 -> Tuples.of(rows, rows1)))
+                        .onItem()
+                        .invoke(rows -> log.trace("save data: {}", rows))
+                        .replaceWith(true))
+            .convert()
+            .toCompletionStage());
+  }
 
-    }
+  public Tuple2<String, Tuple> prepareForInsert(final T data) {
+    final Map<String, Object> entity =
+        getJsonUtils().toMap(data, getJsonConfig().getDbPropsNamesMapper());
+    fixDataMap(data, entity);
 
-    public Tuple2<String, Tuple> prepareForInsert(T data) {
-        Map<String, Object> entity = getJsonUtils().toMap(data, getJsonConfig().getDbPropsNamesMapper());
-        fixDataMap(data, entity);
-
-        List<Object> values = new ArrayList<>();
-        List<String> keys = entity.entrySet().stream()
-                .filter(entry -> null != entry.getValue())
-                .map(entry -> {
-                    values.add(entry.getValue());
-                    return entry.getKey();
+    final List<Object> values = new ArrayList<>();
+    final List<String> keys =
+        entity.entrySet().stream()
+            .filter(entry -> null != entry.getValue())
+            .map(
+                entry -> {
+                  values.add(entry.getValue());
+                  return entry.getKey();
                 })
-                .collect(Collectors.toList());
+            .collect(Collectors.toList());
 
+    final Object firstValue = values.get(0);
 
-        Object firstValue = values.get(0);
+    Object nextValues[] = values.size() <= 1 ? null : (new Object[] {values.get(1)});
 
-        Object nextValues[] = values.size() <= 1 ? null : (
-                new Object[]{values.get(1)}
-        );
-
-        for (int i = 2; i < values.size(); i++) {
-            nextValues = ArrayUtils.addAll(nextValues, values.get(i));
-        }
-
-        String headers = StringUtils.join(keys, COMMA);
-
-        AtomicInteger numParam = new AtomicInteger();
-        List<String> paramsList = values.stream()
-                .map(o -> new StringBuilder().append('$').append(numParam.incrementAndGet()).toString())
-                .collect(Collectors.toList());
-        String valuesString = StringUtils.join(paramsList, COMMA);
-
-        String sql = MessageFormat.format(INSERT_INTO, getTableName(), headers, valuesString);
-
-        Object nextValues1[] = ArrayUtils.clone(nextValues);
-
-        Tuple tuple = Optional.ofNullable(nextValues)
-                .map(objects -> new Tuple(io.vertx.sqlclient.Tuple.of(firstValue, nextValues1)))
-                .orElseGet(() -> Tuple.of(firstValue));
-        return Tuples.of(sql, tuple);
-
+    for (int i = 2; i < values.size(); i++) {
+      nextValues = ArrayUtils.addAll(nextValues, values.get(i));
     }
 
-    protected void fillSelectFromSql() {
-        selectFromSql = MessageFormat.format(SELECT_FROM, allColumnsHeader, getTableName());
-    }
+    final String headers = StringUtils.join(keys, COMMA);
 
-    protected void fillFindByIdTemplate() {
-        findByIdSql = MessageFormat.format(FIND_BY_ID, getSelectFromSql(), getIdFieldName());
-    }
+    final AtomicInteger numParam = new AtomicInteger();
+    final List<String> paramsList =
+        values.stream()
+            .map(o -> new StringBuilder().append('$').append(numParam.incrementAndGet()).toString())
+            .collect(Collectors.toList());
+    final String valuesString = StringUtils.join(paramsList, COMMA);
 
-    protected void fillDeleteByIdTemplate() {
-        deleteByIdSql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
-    }
+    final String sql = MessageFormat.format(INSERT_INTO, getTableName(), headers, valuesString);
 
-    protected Tuple getIdTuple(T entity) {
-        return Tuple.of(getId(entity));
-    }
+    final Object[] nextValues1 = ArrayUtils.clone(nextValues);
 
+    final Tuple tuple =
+        Optional.ofNullable(nextValues)
+            .map(objects -> new Tuple(io.vertx.sqlclient.Tuple.of(firstValue, nextValues1)))
+            .orElseGet(() -> Tuple.of(firstValue));
+    return Tuples.of(sql, tuple);
+  }
+
+  protected void fillSelectFromSql() {
+    selectFromSql = MessageFormat.format(SELECT_FROM, allColumnsHeader, getTableName());
+  }
+
+  protected void fillFindByIdTemplate() {
+    findByIdSql = MessageFormat.format(FIND_BY_ID, getSelectFromSql(), getIdFieldName());
+  }
+
+  protected void fillDeleteByIdTemplate() {
+    deleteByIdSql = MessageFormat.format(DELETE_FROM, getTableName(), getIdFieldName());
+  }
+
+  protected Tuple getIdTuple(final T entity) {
+    return Tuple.of(getId(entity));
+  }
 }

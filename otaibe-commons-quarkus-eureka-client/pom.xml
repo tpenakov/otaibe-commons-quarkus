@@ -3,7 +3,7 @@
     <parent>
         <artifactId>otaibe-commons-quarkus</artifactId>
         <groupId>org.otaibe.commons.quarkus</groupId>
-        <version>01.09.24-SNAPSHOT</version>
+        <version>03.04.10-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -58,9 +58,10 @@
         </dependency>
 
         <dependency>
-            <groupId>org.jboss.spec.javax.ws.rs</groupId>
-            <artifactId>jboss-jaxrs-api_2.1_spec</artifactId>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
         </dependency>
+
 
     </dependencies>
 
