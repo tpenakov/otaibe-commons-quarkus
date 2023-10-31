@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.otaibe.commons.quarkus</groupId>
         <artifactId>otaibe-commons-quarkus</artifactId>
-        <version>03.04.10-SNAPSHOT</version>
+        <version>03.04.11-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
