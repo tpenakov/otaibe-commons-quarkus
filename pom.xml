@@ -35,7 +35,7 @@
         <quarkus.version>3.4.1</quarkus.version>
         <aws.sdk.version>2.20.143</aws.sdk.version>
         <jackson.version>2.15.2</jackson.version>
-        <vertx.version>4.4.5</vertx.version>
+        <vertx.version>4.4.8</vertx.version>
         <mutiny-vertx.version>3.6.0</mutiny-vertx.version>
         <reactor-bom.version>2022.0.11</reactor-bom.version>
         <keycloak.version>22.0.1</keycloak.version>
